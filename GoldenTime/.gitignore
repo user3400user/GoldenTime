@@ -1,0 +1,14 @@
+# Zugangsdaten niemals committen
+*.key
+*.pem
+.env
+credentials*
+secrets*
+push.sh
+# Python
+__pycache__/
+*.pyc
+.venv/
+# OS
+.DS_Store
+Thumbs.db
