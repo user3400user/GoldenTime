@@ -1,0 +1,17 @@
+# Secrets — never commit
+.env
+.env.*
+!.env.example
+
+# Local-only working notes (anything you don't want shared)
+*.local.md
+
+# Node
+node_modules/
+
+# Per-session hook state (report tracking for the citation gate)
+_sources/.reports-*.list
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
