@@ -1,0 +1,4 @@
+# B-Backbone: MaStR-Gesamtdatenexport -> SQLite.
+# Nur für den Export-Adapter (build-db) nötig. Die Query-/Normalisierungs-Logik
+# (speicher_check, normalize) und die Tests laufen ausschließlich auf der stdlib.
+open-mastr>=0.17.1
