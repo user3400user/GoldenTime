@@ -36,4 +36,4 @@ Speicher-Hersteller (Lead-Quelle für Endkunden-Nachfrage), Energieberater (AT-K
 1. **Zahlungsbereitschaft** noch unbewiesen (0/10 Antworten Stand 13.06.) — Verkauf läuft parallel.
 2. **Kanal/Kundengewinnung** ungelöst — Netzwerk-Input nötig.
 3. Erstkontakt-Recht — gelöst über Relevanz + Opt-in.
-4. Datenqualität „kein Speicher" — Betreiber-Gegencheck (v1 betreiberweit).
+4. Datenqualität „kein Speicher" — Betreiber-Gegencheck **bestaetigt machbar via ABR (R3)**; belegbare Aussage = „kein Speicher GEMELDET" (~9% unregistriert).

@@ -33,3 +33,14 @@ Triaged sources actually deep-read this run. Credibility per source-triage rubri
 - Clearingstelle EEG / C.A.R.M.E.N. / Nürnberg / photovoltaik-bw — EEG 20-yr rule already nailed by Verbraucherzentrale [19].
 - de.wikipedia MaStR, photovoltaikforum threads, topagrar (~150k figure) — tertiary/forum; not load-bearing. "~150.000 missed deadline" NOT used (unverified).
 - Scout claim "~15% PV mislocated" — REJECTED: data-quality paper [14] shows PV coordinate errors 0.5–2% (present) + ~95% missing; the 21.3% figure is power-density plausibility, not location.
+
+## Added in run N+1 (deepen, 2026-06-14)
+20. **MaStR public web-JSON endpoint (own live measurement)** — https://www.marktstammdatenregister.de/MaStR/Einheit/EinheitJson/GetErweiterteOeffentlicheEinheitStromerzeugung — primary live data; counts + cohort + caps measured 2026-06-14 (queries in notes.md). (measured)
+21. **MaStR filter-metadata endpoint** — .../GetFilterColumnsErweiterteOeffentlicheEinheitStromerzeugung — primary; column/catalog schema (Energieträger Speicher=2496 etc.). (read)
+22. **MaStR-Nummernkonzept** (BNetzA; Clearingstelle copy, 2017) — https://www.clearingstelle-eeg-kwkg.de/sites/default/files/Nummernkonzept_MaStR_170301-1.pdf — primary; SEE/SEL/SSE/ABR/SNB prefixes + number structure. (read, text-extractable)
+23. **§ 14 MaStRV** — https://www.buzer.de/14_MaStRV.htm (canonical: gesetze-im-internet.de/mastrv/__14.html) — primary law; Stromerzeugungslokation definition. (read; fact-checker confirmed verbatim vs gesetze-im-internet)
+
+### N+1 dropped / not used
+- Datasette `ds.marktstammdatenregister.dev` — intended for the co-location SQL but the host was DOWN (L7 unresponsive, 6 vantage points). G3 left unmeasured; SQL preserved in notes.md.
+- BNetzA EE-Statistik PDF / netztransparenz EEG-Anlagenstammdaten — viable primary cohort sources, but the cohort was measured directly off the live register instead (more current, exact).
+- de.wikipedia / docplayer mirror of Nummernkonzept — superseded by the Clearingstelle PDF + gesetze-im-internet cross-check.

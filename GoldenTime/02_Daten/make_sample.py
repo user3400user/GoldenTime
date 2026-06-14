@@ -30,6 +30,9 @@ def norm(n):
     n = re.sub(r'\b(gmbh|ag|se|kg|co|e\.?k\.?|ug|ohg|gbr|&|und)\b','', (n or '').lower())
     return set(w for w in re.split(r'[^a-zäöüß0-9]+', n) if len(w) > 3)
 
+# HINWEIS (14.06.): PLZ+Namens-Check = LEGACY/FALLBACK. v1-Pipeline nutzt betreiberweiten
+# ABR-Check aus dem Gesamtexport (siehe Architektur-Entscheidung-Datenquelle §7a). Hier belassen,
+# weil make_sample.py der CSV-Demo-Pfad bleibt.
 def speicher_check(plz, betreiber):
     """Gewerbliche Speicher (>20 kW) im Standort-PLZ desselben Betreibers?"""
     try:

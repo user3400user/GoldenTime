@@ -23,14 +23,14 @@ Messung am 208-Lead-Inventar (11.06.), erweiterte Klassifikation:
 
 ## 2 · Die Ausschluss-Hierarchie (harte Filter, in dieser Reihenfolge)
 Ein Lead fliegt raus, sobald EINE Regel greift. Reihenfolge = Prüfreihenfolge in der Pipeline:
-1. **Keine natürliche Person** (PersonenArt ≠ Organisation, oder Name matcht „Vorname Nachname" ohne Rechtsform). → DSGVO + kein Gewerbe.
+1. **Keine natürliche Person** (PersonenArt ≠ Organisation, oder Name matcht „Vorname Nachname" ohne Rechtsform). → DSGVO + kein Gewerbe. (R3-bestaetigt:) `AnlagenbetreiberPersonenArt` ist im Gesamtexport ein STRUKTURIERTER Diskriminator (juristisch vs. natuerlich) statt reiner Namens-Heuristik. CAVEAT: Einzelkaufleute (e.K./e.U., z.B. „Thomas Gerdes Reisen e. K.") sind juristisch natuerliche Personen, aber echtes Gewerbe -> PersonenArt mit Rechtsform-Suffix kombinieren, nicht blind ausschliessen; Mensch-QA fuer Grenzfaelle.
 2. **Keine öffentliche Hand** (Zweckverband, Stadtwerke, Klinikum, Amt, Landkreis, Freistaat, Bundeswehr, ÖPNV/Verkehrsbetriebe …). → Ausschreibung.
 3. **Kein Verein/Stiftung/gGmbH** (e.V., Stiftung, gemeinnützig). → kein Investitionsprofil.
 4. **Kein Konzern/Filialist** (Liste großer Namen + Rechtsform SE/AG als Warnsignal, manuell bestätigen). → zentrale Beschaffung.
 5. **Keine PV-/Energie-/Projektgesellschaft** (Name enthält solar, energie, PV, photovoltaik, „Erneuerbare", Projektgesellschaft). → Selbstversorger/Wettbewerber.
 6. **Keine reine Immobiliengesellschaft** (Name enthält Immobilien/Grundbesitz). → Betriebsaufspaltung, Pain-Owner woanders → bei Anreicherung Standort-Firma suchen.
 7. **Volleinspeisung** → kein Eigenverbrauch → (heute) kein Speicher-Case. (Bucket für Segment 2.)
-8. **Speicher beim Betreiber vorhanden** → Bedarfslücke geschlossen. ABER: Speicher an *anderem* Standort = Premium-Flag, nicht Ausschluss (kennt die Rechnung).
+8. **Speicher beim Betreiber vorhanden** → Bedarfslücke geschlossen. ABER: Speicher an *anderem* Standort = Premium-Flag, nicht Ausschluss (kennt die Rechnung). (R3:) Betreiberweiter Check jetzt sauber ueber `AnlagenbetreiberMastrNummer` (ABR, ~95-100% befuellt) statt PLZ+Namens-Fuzzy. „ohne Speicher" = belegbar nur „kein Speicher GEMELDET" (~9% unregistriert).
 
 ## 3 · Pflicht- vs. Kürfelder (Lead-Anatomie)
 **PFLICHT (ohne diese kein lieferbarer Lead):**
@@ -40,6 +40,8 @@ Ein Lead fliegt raus, sobald EINE Regel greift. Reihenfolge = Prüfreihenfolge i
 **KÜR (steigert Stufe, aber Lieferung nie blockierend):**
 - Straße/Hausnummer · Inbetriebnahmedatum · Entscheider-Name · Direktkontakt (Tel/Mail) · Gesprächsaufhänger · Branche.
 - *Messung: GF-Name 3/5, Tel 3/5 automatisch — daher Stufensystem statt Alles-oder-nichts.*
+
+**(R3-Korrektur:)** `Inbetriebnahmedatum` ist NICHT mehr nur Kuer — es VALIDIERT den Frische-CLAIM (T1). `reg_datum` allein belegt keine Neuinstallation (Nachregistrierung bis 2021). Fuer T1 mitfuehren + bei grosser IBN<->Reg-Luecke flaggen. Maßhalten: Welle ist ~5 J. her -> billige Versicherung, kein Großalarm.
 
 ## 4 · Die Qualitätsstufen A/B/C (operational definiert)
 | Stufe | Definition | Zählt für Mindermengen-Gutschrift? |
@@ -51,7 +53,7 @@ Ein Lead fliegt raus, sobald EINE Regel greift. Reihenfolge = Prüfreihenfolge i
 
 ## 5 · Der Qualitäts-Stempel (Vertrauen als Verkaufsargument)
 Jeder gelieferte Lead trägt sichtbar:
-- **Geprüft am [Datum]** · **Speicher-Check: [Methode + Ergebnis]** · **Provenance je Kürfeld** (z.B. „GF: Impressum, 13.06.") · **Stufe A/B/C** · **Flags** (Premium / Kette / öffentlich, falls grenzwertig geliefert).
+- **Geprüft am [Datum]** · **Speicher-Check: „kein Speicher gemeldet" (betreiberweit via ABR, Stand [Datum])** · **Inbetriebnahme [Jahr] (Frische-Validierung)** · **Provenance je Kürfeld** (z.B. „GF: Impressum, 13.06.") · **Stufe A/B/C** · **Flags** (Premium / Kette / öffentlich, falls grenzwertig geliefert).
 Kein Portal zeigt das. Die Transparenz IST die Differenzierung gegen mehrfachverkaufte Black-Box-Leads.
 
 ## 6 · kWp-Strategie (empirisch nachjustiert)
@@ -104,6 +106,7 @@ Ein realer Installateur deckt ein Einzugsgebiet ab (Radius/PLZ-Cluster), kein Bu
 
 ## 8 · Offene Punkte (abhängig von Research/Build)
 - Lage-Filter (Dach/Freifläche): Feld im Datenexport vorhanden? → R3.
-- Betreiberweiter Speicher-Check: über welche ID verknüpfbar? → R3.
+- Betreiberweiter Speicher-Check: **BEANTWORTET (R3)** = `AnlagenbetreiberMastrNummer` (ABR), ~95-100% befuellt.
+- Gewerblich-Erkennung: `AnlagenbetreiberPersonenArt` (R3) als strukturiertes Signal verfuegbar (e.K.-Caveat, s. §2).
 - Branchen-Erkennung: aus Name heuristisch (heute) vs. aus Handelsregister/WZ-Code (später)?
 - Größenklassen-Pricing: bestätigt sich der höhere Wert großer Anlagen im Markt? → R1 + Netzwerk.

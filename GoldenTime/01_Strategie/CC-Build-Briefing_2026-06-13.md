@@ -36,10 +36,10 @@ Der Drive-Connector ist an die Claude-Chat-Oberfläche gebunden, NICHT an Claude
 ## 5 · Der Build-Auftrag (grob — Details erarbeitet CC mit dir)
 Ziel bis ~27.06.: **end-to-end Prototyp** der 6-Schritt-Kette als saubere, versionierte Pipeline:
 PULL → QUALIFIZIEREN → ANREICHERN (Halbautomatik + QA) → PAKETIEREN → (LIEFERN/FAKTURIEREN als Stubs).
-Offene Architektur-Entscheide für die erste CC-Session: Web-JSON-Pull vs. MaStR-Gesamtdatenexport · Sprache/Struktur (Python-Module vs. Notebook vs. kleines CLI) · wie die Mensch-QA in der Anreicherung eingebaut wird · wo das Liefer-Ledger (Exklusivität) lebt.
+Offene Architektur-Entscheide für die erste CC-Session: **ENTSCHIEDEN (14.06.):** Gesamtexport-Backbone via open-mastr (siehe Architektur-Entscheid), CC baut zuerst Export-Adapter + betreiberweiten ABR-Speicher-Check. Offen bleibt: Sprache/Struktur (Python-Module vs. Notebook vs. kleines CLI) · wie die Mensch-QA in der Anreicherung eingebaut wird · wo das Liefer-Ledger (Exklusivität) lebt.
 
 ## 6 · Prompt zum Start der ersten CC-Session
-> „Lies STATE.md und alle Konzept-Dokumente in diesem Projektordner für den vollen Geschäftskontext. Wir bauen die in §6 von STATE.md beschriebene 6-Schritt-Pipeline als versionierten Prototyp. Bevor du Code schreibst: Schau dir make_sample.py und das clean-v2-CSV als Referenz an, dann schlag mir eine saubere Projektstruktur und die offenen Architektur-Entscheide aus dem CC-Build-Briefing §5 zur Entscheidung vor. Wir entscheiden gemeinsam, dann baust du Schritt für Schritt. Halte CLAUDE.md als technisches Gedächtnis aktuell."
+> „Lies STATE.md und alle Konzept-Dokumente in diesem Projektordner für den vollen Geschäftskontext. Wir bauen die in §6 von STATE.md beschriebene 6-Schritt-Pipeline als versionierten Prototyp. Bevor du Code schreibst: Schau dir make_sample.py und das clean-v2-CSV als Referenz an, dann schlag mir eine saubere Projektstruktur und die offenen Architektur-Entscheide aus dem CC-Build-Briefing §5 zur Entscheidung vor. Die Datenquelle ist entschieden (Gesamtexport via open-mastr, siehe Architektur-Entscheid) — beginne mit dem Export-Adapter + betreiberweitem ABR-Speicher-Check. Wir entscheiden gemeinsam, dann baust du Schritt für Schritt. Halte CLAUDE.md als technisches Gedächtnis aktuell."
 
 ## 7 · Arbeitsteilung Chat ↔ CC (sauber trennen)
 - **Dieser Chat (Konzept):** Strategie, Pricing, Doku, Funnel-Auswertung, Mail-Drafts, STATE.md-Pflege.
