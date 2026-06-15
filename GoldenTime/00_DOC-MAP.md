@@ -1,5 +1,5 @@
 # 00_DOC-MAP — Doc-Ownership & Changeset-Ritual
-**Stand 14.06.2026 · Zweck: jede Tatsache hat EIN Heimat-Doc. Andere verweisen, statt zu wiederholen — killt Drift an der Wurzel, ohne Tooling.**
+**Stand 15.06.2026 · Zweck: jede Tatsache hat EIN Heimat-Doc. Andere verweisen, statt zu wiederholen — killt Drift an der Wurzel, ohne Tooling.**
 
 ## Prinzip
 - **Single-Source-Ownership:** Eine Tatsache wird genau einmal definiert (Owner-Doc). Andere Docs verlinken/verweisen, statt zu kopieren.
@@ -12,7 +12,12 @@
 | Geschaeftsstand, Funnel, Entscheidungs-Log, naechste Aktionen | 01_Strategie/STATE.md |
 | Lead-Qualitaet: Filter, Ausschluss-Hierarchie, Stufen A/B/C, Stempel, Dichte/Trigger | 01_Strategie/Lead-Qualitaets-Spezifikation |
 | Datenquelle, Datenmodell-Grundsaetze, Speicher-Check-Methode, Frische-Logik | 01_Strategie/Architektur-Entscheidung-Datenquelle |
-| Pipeline-Schritt ANREICHERN + QA | 03_Vertrieb/ (folgt, SCHRITT 3) |
+| Pipeline-Schritt ANREICHERN + QA | **v2-deferred (D3)** — Lead-Spec §4 (v2-Tier) |
+| Change-Detection-Engine, Snapshot+Diff, generisches Backbone, Stack | 01_Strategie/Architektur-Entscheidung-Datenquelle §10 |
+| Trigger-Portfolio (T1–T6 + ≥100-kWp/DV-Flag) | 01_Strategie/Lead-Qualitaets-Spezifikation §7d |
+| Compliance: Datenlizenz (dl-de/by-2.0), Redistribution, Provenance, BPV | 04_Compliance/Datenlizenz-und-Provenance |
+| Expansions-Backlog (Achsen A–F), Revisit-Trigger | research/knowledge/expansion-map.md (+ STATE §12) |
+| Produkt-/Wedge-/Ingestion-Entscheidungen (D1–D3) | research/mastr-pv-leads/decisions.md (STATE §8 verweist) |
 | Pricing, Preismodell, Anti-Lowball | 03_Vertrieb/Pricing-Modell |
 | Vertriebs-Mechanik, Konversions-Kette, LOI | 03_Vertrieb/Vertriebs-Mechanik |
 | Geschaeftsmodell (Canvas) | 01_Strategie/Geschaeftsmodell-Canvas |

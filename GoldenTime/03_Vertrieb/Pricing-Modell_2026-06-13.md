@@ -50,3 +50,10 @@ Sagen wir 10 exklusive Leads/Monat, Konversion 5% → 0,5 Abschlüsse/Monat → 
 - Ist Gebiets-Exklusivität wirklich 3–5× Aufpreis wert, oder überschätze ich das?
 - Sollte es eine Aufnahmegebühr / Mindestlaufzeit geben (gegen Churn), oder schreckt das ab?
 - Staffelung nach Lead-Größe (kWp) — zahlt jemand mehr für 500-kWp- als für 50-kWp-Leads?
+
+## 7 · Signal-Lead-Packaging + Exklusivität pro Funktion (Reframe 15.06.)
+**Liefereinheit = Signal-Record (D3), nicht Kontakt-Lead** → das Kernprinzip „wir verkaufen Timing + Exklusivität, nicht Daten/Kontakte" wird *härter*, nicht weicher. (Die Markt-Anker in §2 sind teils Kontakt-/Anfrage-Leads → unser Signal ist eine andere, schlankere Kategorie; Preis bleibt am Käuferwert §1 kalibriert.)
+- **Packaging-Achsen:** pro Signal (10–25 € exkl., Einstieg) · **Regional-Retainer pro Funktion** (200–500 €/Mt, Zielmodell) · Abo „Kaufsignal-Radar" (wiederkehrend, = Retainer-Variante).
+- **Exklusivität pro Käufer-FUNKTION × Gebiet** (nicht pauschal „alle Leads in X"): Der Speicher-Installateur bleibt der **einzige** Speicher-Installateur — derselbe frische ≥100-kWp-Lead kann zusätzlich exklusiv an einen **Direktvermarkter** gehen (andere Spur). Vervielfacht den Umsatz/Gebiet bei Grenzkosten ~0 und **löst die Dichte-Ökonomie** (Lead-Spec §7b Hebel 4). USP/Anti-Lowball (§4) bleibt voll erhalten, weil Exklusivität je Funktion wahr bleibt.
+- **Erstkäufer-Funktionen (D1):** Speicher-/Retrofit-Vendor (T1/T4) + Direktvermarkter (≥100-kWp-Flag) — beide aus demselben Pull.
+- **Offen → Essen (Fragenkatalog §F):** Preis je Funktion; akzeptiert ein Direktvermarkter Retainer-Logik? **Vor Launch:** Redistributions-Lizenz (04_Compliance).

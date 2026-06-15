@@ -1,7 +1,7 @@
 # Sprint-Plan — 2 Wochen bis zum Berater-Essen (~27.06.2026)
 **Erstellt 13.06. · Ziel: zeigbares Halb-Business. Danach fehlt nur ITIL „Deliver".**
 
-> Prinzip: Produkt vorbauen, Kanal/Skalierung offen halten (Netzwerk-Input beim Essen). Verkauf läuft parallel.
+> Prinzip: Produkt vorbauen (jetzt als **Change-Detection-Engine**, Liefereinheit = **Signal-Record**, D1–D3 / s. STATE §0+§12), Kanal/Skalierung offen halten (Netzwerk-Input beim Essen). Verkauf läuft parallel.
 
 ---
 
@@ -21,12 +21,14 @@
 ### Prototyp-Kern (CLAUDE baut, in Claude Code / lokal)
 - [ ] **Pull-v2** stabil: MaStR-Abfrage modular, mit stabilen Schlüsseln (Basis steht: repull_ids.py).
 - [ ] **Qualifizieren** als sauberer Schritt: Filter parametrisierbar, Ketten-/ÖFFENTLICH-Flags, Heuristik-Doku.
-- [ ] **Anreicherung-Halbautomatik:** Domain→Impressum→GF/Tel-Vorschlag + Feld-Provenance, Mensch-QA-Spalte. (Basis: enrich_test.py — Extraktion härten.)
+- [ ] **Snapshot+Diff-Engine (Eigenbau um open-mastr → Postgres):** versionierte Wochen-Snapshots + Diff → Trigger-Klassifikation (Change-Detection-Engine, D2). **Generisches** Backbone (alle Energieträger + Lokationen + EEG + GelöschteUndDeaktivierte + Änderungen), nicht solar-only.
+- [ ] **Post-EEG-Signale ZUERST shippen** (reine Kohorten-Query, kein Diff-Engine nötig → sofort nach Ingest lieferbar). Dann Diff-Trigger (Neuinstallation/Retrofit/Betreiberwechsel).
+- [ ] ~~Anreicherung-Halbautomatik~~ **→ v2-deferred (D3):** kein Kontakt-Enrichment/Outreach/Consent in v1. Liefereinheit = Signal-Record (Käufer kontaktiert selbst).
 
 ## Woche 2 (20.–27.06.) — Demo + Mechanik + Essen-Vorbereitung
 
 ### Zeigbarer Prototyp (CLAUDE)
-- [ ] **Kostproben-Demo end-to-end:** Region rein → qualifizierte, angereicherte, geflaggte Liste + Liefer-Mail raus. (Basis: make_sample.py — auf v2-Anreicherung heben.)
+- [ ] **Kostproben-Demo end-to-end:** Region rein → qualifizierte, geflaggte **Signal-Liste** (Trigger-Typ + Evidenz-URL) + Liefer-Mail raus. (Basis: make_sample.py; Post-EEG-Kohorte zeigt den Fluss, ohne dass die Diff-Engine fertig sein muss.)
 - [ ] Optional: schlichtes Ein-Datei-Frontend, das den Fluss vorführt (kein Produktions-UI).
 
 ### Konzept-Dokumente (CLAUDE, diese Woche bereits angelegt — dann verfeinern)
@@ -43,7 +45,8 @@
 ---
 
 ## Was bewusst NICHT in diesen 2 Wochen passiert
-- Keine Vollautomation der Anreicherung (nimble) — erst wenn Kanal klar (P2).
+- **Kein Kontaktdaten-Enrichment / Outreach-Tooling / Consent-Mgmt (D3 → v2)** — v1 liefert Signal-Records; der Käufer kontaktiert unter eigener Rechtsbasis.
+- Keine Vollautomation der Anreicherung (nimble) — erst v2 (P2).
 - Kein Logo/CI, keine Website, keine Rechtsform/Handelsregister/MWST (erst ab Gate bzw. 100k).
 - Kein CRM — Funnel-Tabelle in STATE.md reicht.
 - Kein BPV-Gesuch (erst Trigger 3.5k MRR oder nach August).

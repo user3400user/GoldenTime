@@ -5,6 +5,8 @@
 
 ---
 
+> **REFRAME 15.06. (D3, s. `research/mastr-pv-leads/decisions.md`):** Liefereinheit ist ab v1 der **Signal-Record** (Entity · Signal-/Trigger-Typ · Evidenz-URL · Region · Datum · Konfidenz · Buy-Relevanz). Die **Ausschluss-Hierarchie (§2)**, **Frische-Regel** und der **Speicher-Score** bleiben v1-tragend — sie qualifizieren das Signal. **Kontaktdaten-Enrichment (§3 Kür: GF/Tel) + Qualitätsstufen A/B/C (§4) sind v2-deferred** (Käufer kontaktiert selbst, eigene Rechtsbasis). Für v1 lautet die Leitfrage: *„Ist das Signal sauber (kein Konzern/öffentlich/Verein/PV-Firma), frisch (IBN-validiert), evidenzbelegt (MaStR-URL) und wirklich ‚jetzt'?"* Das Trigger-Portfolio steht in §7d.
+
 ## 0 · Die Leitfrage
 Was macht einen Lead *gut*? Nicht „mehr Felder", sondern: **Kann der Käufer ihn sofort anrufen, mit echtem Kaufanlass, ohne selbst nachrecherchieren zu müssen, und ohne sich zu blamieren?** Jede Regel unten dient dieser einen Frage.
 
@@ -43,7 +45,8 @@ Ein Lead fliegt raus, sobald EINE Regel greift. Reihenfolge = Prüfreihenfolge i
 
 **(R3-Korrektur:)** `Inbetriebnahmedatum` ist NICHT mehr nur Kuer — es VALIDIERT den Frische-CLAIM (T1). `reg_datum` allein belegt keine Neuinstallation (Nachregistrierung bis 2021). Fuer T1 mitfuehren + bei grosser IBN<->Reg-Luecke flaggen. Maßhalten: Welle ist ~5 J. her -> billige Versicherung, kein Großalarm.
 
-## 4 · Die Qualitätsstufen A/B/C (operational definiert)
+## 4 · Die Qualitätsstufen A/B/C (operational definiert) — **v2-Enrichment-Tier (D3-deferred)**
+> Diese Kontaktstufen gelten für die **v2-Anreicherung** (anrufbare Leads als Upsell). **v1 liefert Signal-Records ohne verifizierten Kontakt** — die Stufen-Logik bleibt hier als fertiges v2-Design erhalten (nichts verworfen, nur sequenziert).
 | Stufe | Definition | Zählt für Mindermengen-Gutschrift? |
 |---|---|---|
 | **A** | Betrieb sauber + **namentlicher Entscheider + Direktkontakt** (durchwahl/personenbezogene Mail), Mensch-verifiziert | ✅ |
@@ -53,7 +56,8 @@ Ein Lead fliegt raus, sobald EINE Regel greift. Reihenfolge = Prüfreihenfolge i
 
 ## 5 · Der Qualitäts-Stempel (Vertrauen als Verkaufsargument)
 Jeder gelieferte Lead trägt sichtbar:
-- **Geprüft am [Datum]** · **Speicher-Check: „kein Speicher gemeldet" (betreiberweit via ABR, Stand [Datum])** · **Inbetriebnahme [Jahr] (Frische-Validierung)** · **Provenance je Kürfeld** (z.B. „GF: Impressum, 13.06.") · **Stufe A/B/C** · **Flags** (Premium / Kette / öffentlich, falls grenzwertig geliefert).
+- **v1 (Signal-Record):** Signal-/Trigger-Typ · **Evidenz-URL** (öffentliche MaStR-Seite) · **Geprüft am [Datum]** · **Speicher-Check: „kein Speicher gemeldet" (betreiberweit via ABR, Stand [Datum]) + Konfidenz** · **Inbetriebnahme [Jahr] (Frische-Validierung)** · **Frische-Score** · **Flags** (Premium / Kette / öffentlich).
+- **v2 (Enrichment-Upsell):** zusätzlich **Provenance je Kürfeld** (z.B. „GF: Impressum, 13.06.") · **Stufe A/B/C**.
 Kein Portal zeigt das. Die Transparenz IST die Differenzierung gegen mehrfachverkaufte Black-Box-Leads.
 
 ## 6 · kWp-Strategie (empirisch nachjustiert)
@@ -84,6 +88,8 @@ Ein realer Installateur deckt ein Einzugsgebiet ab (Radius/PLZ-Cluster), kein Bu
 
 **Konsequenz fuer Pricing/Vertrieb:** Dichte pro Gebiet bestimmt, ob Retainer (200-500/Mt) gerechtfertigt ist. Bei <5 Leads/Woche ist Retainer schwer verkaufbar -> entweder Fenster weiten (Hebel 1) oder Gebiet groesser schneiden (Hebel 3) oder Pro-Lead statt Retainer. Das ist die Bruecke zwischen Datenlage und Preismodell.
 
+**Hebel 4 (15.06., Expansionszulage) — Mehrfachverwertung pro Funktion:** Denselben dünnen Gebiets-Fluss an MEHRERE nicht-konkurrierende Käufer-FUNKTIONEN verkaufen (Speicher-Installateur + Direktvermarkter + O&M …), je exklusiv in ihrer Spur. Macht ein dünnes Gebiet ökonomisch tragfähig OHNE Qualitäts-/Frische-Kompromiss (Grenzkosten ~0). Voraussetzung: Exklusivität **pro Funktion** im Ledger (Pricing-Modell §7, Vertriebs-Mechanik §4).
+
 **Was NICHT stimmt an "mehr Leads = zufriedener Kunde":** Bei 30-150k EUR/Abschluss und oft 1 Abschluss/Quartal will der Kaeufer TREFFER, nicht Masse. Mehr Leads bei sinkender Trefferquote senkt die wahrgenommene Qualitaet. Dichte erhoehen JA — aber Qualitaetsfilter (Paragraph 2) bleibt hart. Dichte ohne Qualitaet ist Schrott-Volumen.
 
 ## 7c · Trigger-Klassifizierung als sichtbares Lead-Attribut (Entscheid 14.06.)
@@ -103,6 +109,20 @@ Ein realer Installateur deckt ein Einzugsgebiet ab (Radius/PLZ-Cluster), kein Bu
 4. **Frische-Score ergaenzt:** zusaetzlich zum Trigger-Typ das Lead-Alter in Tagen + Sortierung (heisseste oben, vgl. 7b).
 
 **Konsequenz fuer Bau (CC):** `trigger_typ` ist Pflichtfeld im Datenmodell von Anfang an. Website-Darstellung + Liefer-CSV zeigen es als Spalte/Badge. Stempel (Paragraph 5) wird um Trigger-Typ erweitert.
+
+## 7d · Trigger-Portfolio (Reframe 15.06. — Change-Detection-Engine)
+Mit dem generischen Diff-Backbone (Architektur §10) wird `trigger_typ` über T1–T3 hinaus zum **Portfolio**; jeder Trigger ist ein Diff auf den Wochen-Snapshots (T2 = reine Kohorten-Query):
+| Code | Signal | Diff/Query | Käufer-Funktion |
+|---|---|---|---|
+| T1 | Neuregistrierung PV o. Speicher | Diff (neue Einheit) | Speicher-Installateur |
+| T2 | Post-EEG / Ü20 | Kohorten-Query (kein Diff) — **shippt zuerst** | Speicher/Retrofit, Direktvermarkter |
+| T3 | Bestand Teileinspeiser o. Speicher | Fenster/Diff | Speicher-Installateur |
+| T4 | Speicher-Retrofit (neuer Speicher an Bestands-ABR) | Diff (neue Speicher-Einheit) | O&M/EMS/Monitoring |
+| T5 | Betreiberwechsel (ABR-Wechsel, gleiche Einheit) | Diff (ABR-Feld) | O&M/Asset-Mgmt/Versicherer |
+| T6 | Stilllegung/Status | Diff (Stilllegungs-Datum) | Rückbau/Repowering |
+| ATTR | **≥100 kWp / Direktvermarktungs-pflichtig** | Attribut-Flag (kWp-Schwelle) | **Direktvermarkter** (2. Funktion, ~0 Kosten) |
+
+Das **≥100-kWp/DV-Flag** ist eine reine Ableitung auf dem vorhandenen `kWp`-Feld — es macht denselben frischen Lead für eine zweite, nicht-konkurrierende Käufer-Funktion sofort adressierbar (Mehrfachverwertung, §7b Hebel 4). Quelle/Begründung: `knowledge/expansion-map.md` (Achse A/B); T4–T6 als Diffs belegt in report.md (Datenänderung/Betreiberwechsel/Stilllegung). **Kill-Notiz:** Wärmepumpen/Wallboxen sind NICHT aus MaStR triggerbar (NS-Verbraucher nicht meldepflichtig) — nicht ins Portfolio aufnehmen.
 
 ## 8 · Offene Punkte (abhängig von Research/Build)
 - Lage-Filter (Dach/Freifläche): Feld im Datenexport vorhanden? → R3.

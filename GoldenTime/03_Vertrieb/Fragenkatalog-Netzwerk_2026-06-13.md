@@ -27,5 +27,10 @@
 13. Konkrete Intros zu Speicher-Anbietern / Installateuren in DE?
 14. Jemand aus dem Vertrieb/Lead-Business, der die Kanal-Frage aus Erfahrung kennt?
 
+## F · Strategie / Skalierung (Expansionszulage 15.06., aus expansion-map)
+15. **Multi-Buyer:** Würde ein Direktvermarkter / Finanzierer / O&M denselben frischen ≥100-kWp-Lead exklusiv für SEINE Funktion kaufen, den mein Speicher-Installateur ohnehin bekommt? (Dichte-Ökonomie, Mehrfachverwertung pro Gebiet.)
+16. **Defensibilität:** open-mastr + Rohdaten sind gratis → niedrige Eintrittsbarriere. Trägt der Moat (Diff-Engine + Snapshot-Historie + Exklusivität pro Funktion + Tempo)? Was würdest DU als Erstes kopieren?
+17. **Horizontal:** Nische oder Engine? Dasselbe generische Backbone zieht z.B. EV-Ladepunkt-Signale aus dem öffentlichen Ladesäulenregister — als Plattform positionieren oder fokussiert bleiben?
+
 ---
 **Mitbringen zum Essen:** Onepager (gedruckt) · 1 Demo-Kostprobe (gedruckt) · Prototyp auf Laptop/Tablet vorführbar · dieses Blatt.
