@@ -142,6 +142,17 @@ class TestStorageBetriebsstatus(unittest.TestCase):
         # eine PV ohne Back-Link bleibt none_reported
         self.assertEqual(idx.classify("ABR_PV", "SEL_PV", None, einheit_nr="SEE_OTHER"), NONE_REPORTED)
 
+    def test_geplant_storage_is_own_bucket_not_exclusion(self):
+        from pipeline.speicher_check import GEPLANT
+        idx = build_storage_index(self._db())
+        # 'In Planung'-Speicher (SSE3 an SEL_PLAN) -> Lokation im geplant-Index, NICHT im In-Betrieb-Set
+        self.assertIn("SEL_PLAN", idx.geplant_locations)
+        self.assertNotIn("SEL_PLAN", idx.locations)
+        # eine PV an dieser Lokation -> GEPLANT (eigener Bucket), NICHT colocated und NICHT none_reported
+        self.assertEqual(idx.classify("ABR_PV", "SEL_PLAN", None), GEPLANT)
+        # In-Betrieb-Speicher hat Vorrang vor geplant
+        self.assertEqual(idx.classify("ABR_PV", "SEL_LIVE", None), COLOCATED)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

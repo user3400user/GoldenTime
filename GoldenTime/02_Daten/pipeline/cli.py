@@ -23,7 +23,7 @@ from . import config
 from . import db as dbmod
 from . import export_adapter
 from .normalize import iter_leads
-from .speicher_check import build_storage_index
+from .speicher_check import GEPLANT, build_storage_index
 from .signal import SignalRecord
 from .triggers import cohort, diff_based
 from .qualify import hierarchy, qa_gate
@@ -166,12 +166,14 @@ def cmd_signals(args: argparse.Namespace) -> int:
             for rec in records:
                 qa_gate.apply_qa(rec, qa_con)
 
+            # Geplanter Speicher -> eigener Bucket (nicht heiß); aus allen anderen Buckets raushalten.
+            geplant = [r for r in records if r.speicher_status == GEPLANT]
+            rest = [r for r in records if r.speicher_status != GEPLANT]
             # Lieferbar = QA-ok UND mit Namen (ohne Firmenname kein B2B-Kontakt -> namenlos-Bucket).
-            deliver = [r for r in records
-                       if r.qa_status in (qa_gate.AUTO_OK, qa_gate.APPROVED) and r.entity]
-            namenlos = [r for r in records if not r.entity]
-            pending = [r for r in records if r.qa_status == qa_gate.PENDING]
-            rejected = [r for r in records if r.qa_status == qa_gate.REJECTED]
+            deliver = [r for r in rest if r.qa_status in (qa_gate.AUTO_OK, qa_gate.APPROVED) and r.entity]
+            namenlos = [r for r in rest if not r.entity]
+            pending = [r for r in rest if r.qa_status == qa_gate.PENDING]
+            rejected = [r for r in rest if r.qa_status == qa_gate.REJECTED]
             if args.kaeufer and args.funktion:   # optionales Ledger-Gate (Exklusivität + Dedupe)
                 deliver = ledgermod.filter_deliverable(qa_con, deliver, args.kaeufer, args.funktion, gid, "T2")
             deliver.sort(key=lambda r: (r.dv_flag, r.kwp or 0), reverse=True)  # DV + größte zuerst
@@ -184,11 +186,12 @@ def cmd_signals(args: argparse.Namespace) -> int:
 
             for metrik, wert in (("signale", len(records)), ("lieferbar", len(deliver)),
                                  ("pending_qa", len(pending)), ("namenlos", len(namenlos)),
+                                 ("speicher_geplant", len(geplant)),
                                  ("dv_flag", sum(r.dv_flag for r in deliver))):
                 metricsmod.record(qa_con, metrik=metrik, wert=wert, woche=woche, gebiet=gid, trigger="T2")
 
             print(f"Gebiet {name}: {len(records)} T2-Signale · {len(deliver)} lieferbar · "
-                  f"{len(pending)} QA-pending · {len(namenlos)} namenlos (Privatperson) · "
+                  f"{len(pending)} QA-pending · {len(namenlos)} namenlos · {len(geplant)} Speicher-geplant · "
                   f"{len(rejected)} rejected · DV-Flag {sum(r.dv_flag for r in deliver)}.")
             if deliver and not args.offline:
                 print(f"  Evidenz-Direktlinks: {aufgeloest}/{len(deliver)} aufgelöst "
@@ -369,17 +372,19 @@ def cmd_liefern(args: argparse.Namespace) -> int:
     slug, heute = _slug(name), dt.date.today().isoformat()
     outdir = Path(args.out_dir) if args.out_dir else Path(".")
     outdir.mkdir(parents=True, exist_ok=True)
-    for label, recs in (("lieferbar", b.lieferbar), ("qa_pending", b.pending), ("namenlos", b.namenlos)):
+    for label, recs in (("lieferbar", b.lieferbar), ("qa_pending", b.pending),
+                        ("namenlos", b.namenlos), ("speicher_geplant", b.speicher_geplant)):
         if recs:
             p = outdir / f"{slug}_{label}_{heute}.csv"
             _write_signals_csv(p, recs)
-            print(f"  {label:10s}: {len(recs):4d} -> {p}")
+            print(f"  {label:16s}: {len(recs):4d} -> {p}")
     mail = deliver.liefer_mail(b, kaeufer=args.kaeufer, funktion=args.funktion or "Speicher-Installateur")
     mp = outdir / f"{slug}_liefermail_{heute}.txt"
     mp.write_text(mail, encoding="utf-8")
-    print(f"  mail      :      -> {mp}")
+    print(f"  mail            :      -> {mp}")
     print(f"Gebiet {name}: {len(b.lieferbar)} lieferbar ({b.betriebe()} Betriebe) · {len(b.pending)} QA-pending · "
-          f"{len(b.namenlos)} namenlos · {b.colocated_ausgeschlossen} colocated-ausgeschlossen.")
+          f"{len(b.namenlos)} namenlos · {len(b.speicher_geplant)} Speicher-geplant · "
+          f"{b.colocated_ausgeschlossen} colocated-ausgeschlossen.")
     if args.print_mail:
         print("\n" + "=" * 78 + "\n" + mail)
     return 0
@@ -404,6 +409,70 @@ def cmd_mengen(args: argparse.Namespace) -> int:
         con.close()
         qa_con.close()
     print(deliver.mengen_report(buckets))
+    return 0
+
+
+def cmd_weekly(args: argparse.Namespace) -> int:
+    """Wöchentlicher Takt (A): Export neu laden -> dated Snapshot -> Prune -> Hinweis auf echten Diff."""
+    if not args.skip_build:
+        print("1/3 build-db: Export neu laden (kann ~5-30 min dauern) …")
+        export_adapter.build_db()
+    con = dbmod.connect(args.db)
+    try:
+        print("2/3 Snapshot schreiben …")
+        out = snapstore.write_snapshot(con)
+    finally:
+        con.close()
+    print(f"      -> {out.name}")
+    geloescht = snapstore.prune()
+    metas = snapstore.list_snapshots()
+    print(f"3/3 Prune: {len(geloescht)} alte gelöscht · vorhandene Snapshots: {[m.datum for m in metas]}")
+    if len(metas) >= 2:
+        print("✓ ≥2 Snapshots — `diff --gebiet <id>` liefert jetzt ECHTE FLUSS-Signale (T1/T4).")
+    else:
+        print("→ Erst 1 Snapshot. Nächste Woche denselben Befehl = erster echter Wochen-Diff.")
+    return 0
+
+
+def cmd_gate_demo(args: argparse.Namespace) -> int:
+    """Gate-Demo-Paket (B): Liefer-Pakete für die Demo-Gebiete + ehrlicher Mengen-Report, ein Lauf."""
+    store = cs.load()
+    gids = ([g.strip() for g in args.gebiete.split(",") if g.strip()]
+            if args.gebiete else [g["id"] for g in store.active_gebiete()])
+    outdir = Path(args.out_dir) if args.out_dir else Path("gate_demo")
+    outdir.mkdir(parents=True, exist_ok=True)
+    heute = dt.date.today().isoformat()
+    con = dbmod.connect(args.db)
+    qa_con = statemod.connect()
+    buckets = []
+    try:
+        index = build_storage_index(con)
+        for gid in gids:
+            g = store.gebiet(gid)
+            if not g:
+                print(f"  Gebiet '{gid}' unbekannt — übersprungen.")
+                continue
+            name = g.get("name", gid)
+            b = deliver.run_region(con, qa_con, plz_prefixes=tuple(g.get("plz_prefixes", ())),
+                                   region=name, gebiet_id=gid, resolve=not args.offline, index=index)
+            buckets.append(b)
+            slug = _slug(name)
+            for label, recs in (("lieferbar", b.lieferbar), ("qa_pending", b.pending),
+                                ("namenlos", b.namenlos), ("speicher_geplant", b.speicher_geplant)):
+                if recs:
+                    _write_signals_csv(outdir / f"{slug}_{label}_{heute}.csv", recs)
+            (outdir / f"{slug}_liefermail_{heute}.txt").write_text(
+                deliver.liefer_mail(b, kaeufer=args.kaeufer,
+                                    funktion=args.funktion or "Speicher-Installateur"), encoding="utf-8")
+            print(f"  {name}: {len(b.lieferbar)} lieferbar ({b.betriebe()} Betriebe) "
+                  f"-> {slug}_lieferbar/qa_pending/namenlos/speicher_geplant_*.csv + Mail")
+    finally:
+        con.close()
+        qa_con.close()
+    report = deliver.mengen_report(buckets)
+    (outdir / f"mengen_report_{heute}.txt").write_text(report, encoding="utf-8")
+    print(f"\nGate-Demo-Paket -> {outdir}/\n")
+    print(report)
     return 0
 
 
@@ -456,6 +525,19 @@ def main(argv: list[str] | None = None) -> int:
     sm = sub.add_parser("mengen", help="ehrlicher Mengen-/Dichte-Report (Betriebe UND Einheiten)")
     sm.add_argument("--gebiet", default="", help="ein Gebiet (Default: alle aktiven)")
     sm.set_defaults(func=cmd_mengen)
+
+    sw = sub.add_parser("weekly", help="Wochen-Takt: build-db -> dated Snapshot -> prune (für FLUSS-Diff)")
+    sw.add_argument("--skip-build", action="store_true",
+                    help="Export NICHT neu laden, nur Snapshot aus vorhandener DB")
+    sw.set_defaults(func=cmd_weekly)
+
+    sgd = sub.add_parser("gate-demo", help="Gate-Demo-Paket: Liefer-Pakete + Mengen-Report (reproduzierbar)")
+    sgd.add_argument("--gebiete", default="", help="Gebiet-IDs komma-getrennt (Default: alle aktiven)")
+    sgd.add_argument("--kaeufer", default="")
+    sgd.add_argument("--funktion", default="")
+    sgd.add_argument("--out-dir", default="")
+    sgd.add_argument("--offline", action="store_true")
+    sgd.set_defaults(func=cmd_gate_demo)
 
     sq = sub.add_parser("qa", help="Mensch-QA-Gate (D5): Queue / approve / reject / approve-abr")
     sq.add_argument("action", choices=["list", "approve", "reject", "approve-abr"])

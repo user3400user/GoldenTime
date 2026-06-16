@@ -98,7 +98,14 @@ aus dem Quellcode vermuteten deutschen XSD-Namen waren over-thought — `inspect
   **Gebaut + integriert + ZWEIT-REVIEW-gehärtet, 172 Tests grün:** register(D4) · snapshot+diff(K2) ·
   triggers cohort/diff_based(K3) · qualify+QA(K4/D5) · ledger(K6) · enrich(K7) + evidenz-resolver ·
   dashboard(K8) · deliver(TEIL 5). CLI: `signals`/`qa`/`snapshot`/`diff`/`ledger`/`dashboard`/`liefern`/
-  `mengen`/`evidenz-check`. Eigene `pipeline/README.md`.
+  `mengen`/`evidenz-check`/**`weekly`**/**`gate-demo`**. Eigene `pipeline/README.md`.
+- **Wochen-Takt gestartet (16.06.):** Baseline-Snapshot `snapshots/snap_2026-06-15.sqlite` (8,79 Mio Einheiten,
+  Stand = MAX(DatumLetzteAktualisierung)) geschrieben — die Uhr läuft. `cli weekly` = build-db → dated Snapshot
+  → prune; ein 2. Snapshot (andere Woche) → `diff` liefert echte **FLUSS-Signale (T1/T4)**. `cli gate-demo`
+  = reproduzierbares Demo-Paket (Liefer-Pakete je Gebiet + Mengen-Report) für das Berater-Essen.
+- **Speicher-Klassifikation jetzt 4-Wege** (Gründer-Entscheid): none_reported / operator_elsewhere(Premium) /
+  colocated(Ausschluss, nur In-Betrieb-Speicher) / **geplant** ('In Planung'-Speicher am Standort → eigener
+  Bucket, NICHT heiß, für Re-Opportunity mitgeführt). `config.STORAGE_GEPLANT_STATUS`.
 - **Unabhängige Zweit-Review (16.06.) — Datenpipeline+Diff-Engine+Integrität korrekt; Qualifizierer war
   unvollständig.** Fixes (4 Blöcke, je Commit auf `vollpaket-phase1`): Qualifizierer §2 vollständig (Namens-
   muster + erweiterte Heuristik-Listen mit `re:`-Wortgrenzen + Immobilien + SE/AG → QA-Flags; Münsterland

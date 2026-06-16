@@ -96,6 +96,9 @@ COL: dict[str, tuple[str, ...]] = {
 # KLARTEXT auf: Bundesland='Bayern', Einspeisungsart='Volleinspeisung',
 # EinheitBetriebsstatus='In Betrieb'. -> Region über PLZ filtern (nicht Bundesland-Code).
 BETRIEBSSTATUS_IN_BETRIEB = "In Betrieb"   # Klartext im Export (Web-JSON war Code 35)
+STORAGE_GEPLANT_STATUS = "In Planung"      # Speicher in Planung -> eigener 'geplant'-Bucket (Gründer-
+#   Entscheid 16.06.): NICHT in die heiße Lieferliste (sonst Fehlalarm 'hat schon Speicher'), aber
+#   mitführen für die Re-Opportunity (falls die geplante Anlage doch nicht kommt).
 # Reine Web-JSON-Codes (NICHT für Export-Queries; *_extended ist Klartext):
 ENERGIETRAEGER_SOLAR = 2495
 ENERGIETRAEGER_SPEICHER = 2496

@@ -35,12 +35,14 @@ log = logging.getLogger(__name__)
 NONE_REPORTED = "none_reported"
 OPERATOR_ELSEWHERE = "operator_elsewhere"
 COLOCATED = "colocated"
+GEPLANT = "geplant"            # Speicher am Standort IN PLANUNG -> eigener Bucket (nicht heiß, nicht Ausschluss)
 
 # Belegbare Aussage je Code (R3: "gemeldet", nicht "vorhanden")
 LABEL = {
     NONE_REPORTED: "kein Speicher gemeldet",
     OPERATOR_ELSEWHERE: "Speicher beim Betreiber (anderer Standort) gemeldet",
     COLOCATED: "Speicher am Standort gemeldet",
+    GEPLANT: "Speicher am Standort in Planung gemeldet",
 }
 
 
@@ -52,6 +54,8 @@ class StorageIndex:
     locations: frozenset[str]   # SEL-Lokationen mit >=1 gemeldetem Speicher
     colocated_solar: frozenset[str] = frozenset()   # Solar-EinheitMastrNr, auf die ein Speicher
     #   per GemeinsamRegistrierteSolareinheitMastrNummer direkt zeigt (Zweit-Review-Fix)
+    geplant_locations: frozenset[str] = frozenset()  # Lokationen mit Speicher-Status 'In Planung'
+    geplant_solar: frozenset[str] = frozenset()      # Solar-Einheiten mit co-reg. GEPLANTEM Speicher
 
     def classify(self, abr: str | None, lokation: str | None,
                  speicher_am_gleichen_ort: object = None, einheit_nr: str | None = None) -> str:
@@ -70,6 +74,11 @@ class StorageIndex:
         )
         if colocated:
             return COLOCATED
+        # In-Betrieb-Speicher hat Vorrang; sonst: ein GEPLANTER Speicher am Standort -> eigener Bucket
+        # (kriegen ja gerade einen -> nicht heiß, aber kein 'hat schon Speicher'-Ausschluss).
+        if (bool(lokation) and lokation in self.geplant_locations) or (
+                bool(einheit_nr) and einheit_nr in self.geplant_solar):
+            return GEPLANT
         if abr and abr in self.operators:
             return OPERATOR_ELSEWHERE
         return NONE_REPORTED
@@ -135,17 +144,30 @@ def build_storage_index(
     # Direkter Back-Link Speicher -> co-registrierte Solar-Einheit (GemeinsamRegistrierteSolar-
     # einheitMastrNummer). Fängt co-lokale Paare mit abweichender Lokation (Zweit-Review-Fix).
     gem_col = dbmod.resolve_column(cols, "gem_solar_nr")
-    colocated_solar: set[str] = set()
-    if gem_col:
-        colocated_solar = {
+
+    def _distinct(col, extra_where, extra_params):
+        if not col:
+            return set()
+        return {
             r[0]
             for r in con.execute(
-                f'SELECT DISTINCT "{gem_col}" FROM "{table}" '
-                f'WHERE "{gem_col}" IS NOT NULL AND "{gem_col}" <> \'\'' + status_where,
-                status_params,
-            )
+                f'SELECT DISTINCT "{col}" FROM "{table}" '
+                f'WHERE "{col}" IS NOT NULL AND "{col}" <> \'\'' + extra_where, extra_params)
         }
 
-    log.info("Speicher-Index aus '%s' (nur '%s'): %d Betreiber, %d Lokationen, %d co-reg. Solar-Einheiten.",
-             table, config.BETRIEBSSTATUS_IN_BETRIEB, len(operators), len(locations), len(colocated_solar))
-    return StorageIndex(frozenset(operators), frozenset(locations), frozenset(colocated_solar))
+    colocated_solar = _distinct(gem_col, status_where, status_params)
+
+    # Geplante Speicher (Status 'In Planung'): eigener Bucket-Index (Lokation + co-reg. Solar) —
+    # NICHT Ausschluss (kein In-Betrieb-Speicher), aber auch nicht heiß (kriegen ja gerade einen).
+    geplant_locations: set[str] = set()
+    geplant_solar: set[str] = set()
+    if status_col:
+        gp_where, gp_params = f' AND "{status_col}" = ?', [config.STORAGE_GEPLANT_STATUS]
+        geplant_locations = _distinct(sel_col, gp_where, gp_params)
+        geplant_solar = _distinct(gem_col, gp_where, gp_params)
+
+    log.info("Speicher-Index aus '%s': %d Betreiber, %d Lok., %d co-reg. Solar (In Betrieb); "
+             "%d Lok. + %d Solar geplant.", table, len(operators), len(locations),
+             len(colocated_solar), len(geplant_locations), len(geplant_solar))
+    return StorageIndex(frozenset(operators), frozenset(locations), frozenset(colocated_solar),
+                        frozenset(geplant_locations), frozenset(geplant_solar))

@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 
 from .enrich import mastr_resolve
 from .qualify import hierarchy, qa_gate
-from .speicher_check import build_storage_index
+from .speicher_check import GEPLANT, build_storage_index
 from .triggers import cohort
 
 # T2/T3 = Bestand (Kohorte, einmal ausschöpfbar); Diff-Trigger = Fluss (wiederkehrend pro Woche).
@@ -35,7 +35,8 @@ class Buckets:
     pending: list = field(default_factory=list)     # Grenzfälle in manueller QA
     namenlos: list = field(default_factory=list)    # Privatperson (redacted) -> Anreicherung
     rejected: list = field(default_factory=list)
-    colocated_ausgeschlossen: int = 0               # wegen Speicher am Standort verworfen (Transparenz)
+    speicher_geplant: list = field(default_factory=list)  # Speicher am Standort in Planung -> Re-Opportunity
+    colocated_ausgeschlossen: int = 0               # wegen Speicher am Standort (In Betrieb) verworfen
     roh: int = 0
 
     def betriebe(self) -> int:
@@ -55,7 +56,9 @@ def run_region(con, qa_con, *, plz_prefixes, region, gebiet_id="", resolve=True,
     b = Buckets(region=region, gebiet_id=gebiet_id, roh=len(recs),
                 colocated_ausgeschlossen=stats.get("colocated_ausgeschlossen", 0))
     for r in recs:
-        if not r.entity:
+        if r.speicher_status == GEPLANT:           # eigener Bucket: nicht heiß, für Re-Opportunity
+            b.speicher_geplant.append(r)
+        elif not r.entity:
             b.namenlos.append(r)
         elif r.qa_status == qa_gate.REJECTED:
             b.rejected.append(r)
@@ -87,8 +90,8 @@ def liefer_mail(b: Buckets, *, kaeufer: str = "", funktion: str = "Speicher-Inst
         "",
         f"WAS DRIN IST: {len(b.lieferbar)} lieferbare gewerbliche Signale ({b.betriebe()} Betriebe). "
         f"Trigger-Art: {', '.join(arten)}.",
-        f"Zurückgehalten (Qualität): {len(b.pending)} Grenzfälle in manueller Prüfung, "
-        f"{len(b.namenlos)} Privatpersonen (kein Gewerbe-Kontakt).",
+        f"Zurückgehalten: {len(b.pending)} QA-Grenzfälle, {len(b.namenlos)} Privatpersonen, "
+        f"{len(b.speicher_geplant)} mit geplantem Speicher (Re-Opportunity, nicht heiß).",
         f"Exklusivität: {funktion} × {b.region} × {trigger} — exklusiv für dich, vertraglich zugesichert.",
         "",
         "Je Signal: Betrieb · kWp · Ort · Trigger · Konfidenz · Speicher-Status · Evidenz "
@@ -119,19 +122,20 @@ def mengen_report(buckets: list) -> str:
         "EHRLICHER MENGEN-/DICHTE-REPORT (Zweit-Review TEIL 5)",
         f"Stand {dt.date.today().isoformat()} · Zählung: Betriebe (distinct ABR) UND Einheiten · Trigger T2",
         "",
-        f"{'Gebiet':16s} {'Art':12s} {'Betriebe':>9s} {'Einheiten':>10s} {'QA-pend':>8s} "
-        f"{'namenlos':>9s} {'coloc-aus':>10s} {'roh':>6s}",
-        "-" * 86,
+        f"{'Gebiet':16s} {'Art':9s} {'Betriebe':>9s} {'Einheit.':>9s} {'QA-pend':>8s} "
+        f"{'namenlos':>9s} {'geplant':>8s} {'coloc-aus':>10s} {'roh':>6s}",
+        "-" * 95,
     ]
     s_betr = s_einh = 0
     for b in buckets:
-        L.append(f"{b.region[:16]:16s} {'BESTAND':12s} {b.betriebe():>9d} {len(b.lieferbar):>10d} "
-                 f"{len(b.pending):>8d} {len(b.namenlos):>9d} {b.colocated_ausgeschlossen:>10d} {b.roh:>6d}")
+        L.append(f"{b.region[:16]:16s} {'BESTAND':9s} {b.betriebe():>9d} {len(b.lieferbar):>9d} "
+                 f"{len(b.pending):>8d} {len(b.namenlos):>9d} {len(b.speicher_geplant):>8d} "
+                 f"{b.colocated_ausgeschlossen:>10d} {b.roh:>6d}")
         s_betr += b.betriebe()
         s_einh += len(b.lieferbar)
     L += [
-        "-" * 86,
-        f"{'Σ':16s} {'':12s} {s_betr:>9d} {s_einh:>10d}",
+        "-" * 95,
+        f"{'Σ':16s} {'':9s} {s_betr:>9d} {s_einh:>9d}",
         "",
         "Lesart (Pricing-relevant, NICHT geschönt):",
         "· T2 (Post-EEG) ist BESTAND — die Kohorte wird EINMAL ausgeschöpft, danach kein Nachschub.",
