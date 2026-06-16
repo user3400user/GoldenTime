@@ -19,6 +19,8 @@ klinik
 klinikum
 krankenhaus
 universitätsklinik
+# 'Hospital' nur als Wort (Marien-Hospital ja, 'Hospitality'/Hotel-Catering NEIN)
+re:\bhospital\b
 # kommunale Ver-/Entsorgung + Verkehr (Eigenbetriebe, Abfall, ÖPNV)
 eigenbetrieb
 entsorgung

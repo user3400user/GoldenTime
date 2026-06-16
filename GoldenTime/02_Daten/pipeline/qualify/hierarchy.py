@@ -63,6 +63,30 @@ FLAG_PRIVAT_REDACTED = "PRIVATPERSON_REDACTED"
 # §2.4: Rechtsform SE/AG als Konzern-Warnsignal -> KETTE_PRUEFEN (manuell bestätigen).
 _RECHTSFORM_SE_AG = re.compile(r"\b(se|ag)\b", re.IGNORECASE)
 
+# market_actors.Rechtsform (Katalog-Klartext, exakt) -> QA-Flag. Die Rechtsform ist die WAHRHEIT zur
+# Vereins-/Gemeinnützigkeits-/öffentlich-rechtlichen/Konzern-Form, die der FIRMENNAME oft nicht trägt
+# (R3-Befund: 'Seniorenhilfe St. Franziskus GmbH' = gGmbH, 'INI' = e.V. — beide rutschten namensbasiert
+# durch). Werte empirisch aus dem market_actors-Katalog. Treffer -> Flag (Mensch-QA), NIE harte Streichung.
+_RECHTSFORM_FLAG: dict[str, str] = {
+    "e.v.": "VEREIN_PRUEFEN",
+    "e. v.": "VEREIN_PRUEFEN",
+    "ggmbh": "VEREIN_PRUEFEN",
+    "eg": "VEREIN_PRUEFEN",
+    "stiftung des privatrechts": "VEREIN_PRUEFEN",
+    "vvag": "VEREIN_PRUEFEN",
+    "körperschaft des öffentlichen rechts": "OEFFENTLICH_PRUEFEN",
+    "anstalt des öffentlichen rechts": "OEFFENTLICH_PRUEFEN",
+    "stiftung des öffentlichen rechts": "OEFFENTLICH_PRUEFEN",
+    "eigenbetrieb": "OEFFENTLICH_PRUEFEN",
+    "ag": "KETTE_PRUEFEN",
+    "se": "KETTE_PRUEFEN",
+}
+
+
+def _rechtsform_flag(rechtsform: object) -> str | None:
+    """Exakter (case-insensitiver) Katalog-Treffer der Rechtsform -> QA-Flag, sonst None."""
+    return _RECHTSFORM_FLAG.get(str(rechtsform or "").strip().lower())
+
 # §2.1: Firmen-/Rechtsform-/Branchen-Tokens, deren Vorkommen einen Namen als FIRMA (nicht
 # bloße Person) ausweist — Gegenprobe zum Personennamen-Muster.
 _FIRMA_TOKEN = re.compile(
@@ -208,6 +232,7 @@ def _join_market_actors(
     key_col = dbmod.resolve_column(cols, "markt_mastr_nr")
     name_col = dbmod.resolve_column(cols, "firmenname")
     pa_col = dbmod.resolve_column(cols, "personenart")
+    rf_col = dbmod.resolve_column(cols, "rechtsform")
     if not key_col:
         log.warning("market_actors '%s' ohne MastrNummer-Spalte — Join übersprungen.", table)
         return {}
@@ -217,6 +242,8 @@ def _join_market_actors(
         select.append(f'"{name_col}" AS firmenname')
     if pa_col:
         select.append(f'"{pa_col}" AS personenart')
+    if rf_col:
+        select.append(f'"{rf_col}" AS rechtsform')
     select_sql = "SELECT " + ", ".join(select) + f' FROM "{table}" WHERE "{key_col}" IN '
 
     lookup: dict[str, sqlite3.Row] = {}
@@ -248,6 +275,7 @@ def enrich_and_qualify(
         row = lookup.get(record.betreiber_mastr_nr) if record.betreiber_mastr_nr else None
         firmenname = record.entity
         personenart: str | None = None
+        rechtsform: str | None = None
         if row is not None:
             keys = row.keys()
             if "firmenname" in keys and row["firmenname"]:
@@ -256,6 +284,8 @@ def enrich_and_qualify(
                 record.entity = firmenname
             if "personenart" in keys:
                 personenart = row["personenart"]
+            if "rechtsform" in keys:
+                rechtsform = row["rechtsform"]
 
         _merke_personenart(record, personenart)
 
@@ -269,6 +299,12 @@ def enrich_and_qualify(
                 liste_griff = True
         if record.entity and _RECHTSFORM_SE_AG.search(record.entity):
             _add_flags(record, "KETTE_PRUEFEN")
+            liste_griff = True
+        # (2a') Rechtsform-Feld (market_actors) — fängt Verein/gemeinnützig/öffentl./Konzern, die der
+        # Name NICHT zeigt (gGmbH/e.V./KöR). Hat wie die Listen Vorrang vor dem groben Personenmuster.
+        rf_flag = _rechtsform_flag(rechtsform)
+        if rf_flag:
+            _add_flags(record, rf_flag)
             liste_griff = True
 
         # (2b) §2.1 natürliche Person: PersonenArt-Klasse (immer) ODER bloßer Personenname (auch bei

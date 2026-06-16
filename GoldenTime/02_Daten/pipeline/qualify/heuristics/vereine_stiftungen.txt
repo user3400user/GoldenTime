@@ -42,3 +42,8 @@ re:\bvr[- ]?bank\b
 re:\bbank\b
 sparkasse
 kreissparkasse
+# Caritative Senioren-/Pflegeträger — Gemeinnützigkeit steht oft NUR in der Rechtsform (gGmbH/e.V./
+# Stiftung), der Name trägt bloß 'GmbH' (Beleg: 'Seniorenhilfe St. Franziskus GmbH' = gGmbH). Flag -> QA.
+seniorenhilfe
+seniorenzentrum
+altenheim

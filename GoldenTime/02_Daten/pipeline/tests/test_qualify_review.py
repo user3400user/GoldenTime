@@ -78,6 +78,17 @@ class TestMatcherRegex(unittest.TestCase):
     def test_immobilien(self):
         self.assertTrue(self.m("Keller Grundstücksverwaltungsgesellschaft GmbH", "immobilien.txt"))
 
+    def test_r3_caritativ_und_hospital(self):
+        # R3 (datengetrieben): Gemeinnützigkeit/Vereinsform steht oft nur in market_actors.Rechtsform,
+        # der Name trägt bloß 'GmbH'. Namens-Token fangen den häufigsten Fall trotzdem -> QA-Flag.
+        self.assertTrue(self.m("Seniorenhilfe St. Franziskus GmbH", "vereine_stiftungen.txt"))
+        self.assertTrue(self.m("Seniorenzentrum am Park GmbH", "vereine_stiftungen.txt"))
+        self.assertTrue(self.m("Altenheim St. Josef", "vereine_stiftungen.txt"))
+        # 'Hospital' nur als Wort: Krankenhausträger ja, 'Hospitality'/Hotel-Catering NEIN (kein FP).
+        self.assertTrue(self.m("St. Marien-Hospital Lüdinghausen", "oeffentliche_hand.txt"))
+        self.assertTrue(self.m("Josephs-Hospital Warendorf", "oeffentliche_hand.txt"))
+        self.assertFalse(self.m("Hospitality Group GmbH", "oeffentliche_hand.txt"))
+
     def test_zweit_review3_neue_muster(self):
         # KöR-Wortgrenze (öffentliche Hand) — 'kör' nur als Wort, nicht in 'Körting'/'Akörper'.
         self.assertTrue(self.m("Studierendenwerk KöR", "oeffentliche_hand.txt"))
@@ -128,6 +139,36 @@ class TestEnrichPrecedence(unittest.TestCase):
 
     def test_immobilien_in_qa_flags(self):
         self.assertIn("IMMOBILIEN_PRUEFEN", qa_gate.QA_FLAGS)
+
+    def _db_rf(self, actors):
+        # market_actors MIT Rechtsform-Spalte (R3: Rechtsform-Join). Fehlt die Spalte (andere Tests),
+        # bleibt rechtsform None -> kein Flag (rückwärtskompatibel).
+        con = sqlite3.connect(":memory:")
+        con.row_factory = sqlite3.Row
+        con.execute("CREATE TABLE market_actors "
+                    "(MastrNummer TEXT, Firmenname TEXT, Personenart TEXT, Rechtsform TEXT)")
+        con.executemany("INSERT INTO market_actors VALUES (?,?,?,?)", actors)
+        con.commit()
+        return con
+
+    def test_rechtsform_join_flaggt_was_der_name_verbirgt(self):
+        # R3: Verein/Gemeinnützigkeit/öffentl.-Recht aus market_actors.Rechtsform — auch wenn der
+        # Firmenname die Form NICHT zeigt. Belege: 'gGmbH' (Name 'GmbH'), 'e.V.' (Name 'INI').
+        org = "Organisation (Unternehmen, ...)"
+        con = self._db_rf([
+            ("ABR1", "Seniorenhilfe St. Franziskus GmbH", org, "gGmbH"),
+            ("ABR2", "INI", org, "e.V."),
+            ("ABR3", "Albatros", org, "Anstalt des öffentlichen Rechts"),
+            ("ABR4", "Wegener Stahlservice GmbH", org, "GmbH"),
+        ])
+        recs = [_rec(f"SEE{i}", f"ABR{i}") for i in range(1, 5)]
+        H.enrich_and_qualify(recs, con)
+        f = {r.einheit_mastr_nr: set(r.flags) for r in recs}
+        self.assertIn("VEREIN_PRUEFEN", f["SEE1"])         # gGmbH trotz 'GmbH'-Name
+        self.assertIn("VEREIN_PRUEFEN", f["SEE2"])         # e.V. trotz nichtssagendem 'INI'
+        self.assertNotIn("NATUERLICHE_PERSON_PRUEFEN", f["SEE2"])  # Rechtsform hat Vorrang
+        self.assertIn("OEFFENTLICH_PRUEFEN", f["SEE3"])    # AöR rein aus Rechtsform (Name neutral)
+        self.assertEqual(f["SEE4"], set())                 # normale GmbH -> kein Flag, bleibt lieferbar
 
 
 class TestStorageBetriebsstatus(unittest.TestCase):

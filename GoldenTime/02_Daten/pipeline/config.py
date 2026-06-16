@@ -89,6 +89,9 @@ COL: dict[str, tuple[str, ...]] = {
     #     (Phase 0 verifiziert), sondern auf market_actors. Join: Einheit.abr -> market_actors.MastrNummer.
     "firmenname": ("Firmenname",),
     "markt_mastr_nr": ("MastrNummer",),
+    # Rechtsform = Wahrheit zu Gemeinnützigkeit/Verein/öffentl./Konzern, die der Name oft NICHT trägt
+    # ('Seniorenhilfe St. Franziskus GmbH' = gGmbH; 'INI' = e.V.). Katalog-Klartext (empirisch verifiziert).
+    "rechtsform": ("Rechtsform",),
 }
 
 # --- Katalog-Werte (Phase 0, 16.06. verifiziert) ---------------------------
