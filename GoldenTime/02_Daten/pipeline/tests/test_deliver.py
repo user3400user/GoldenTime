@@ -84,5 +84,46 @@ class TestMengenReport(unittest.TestCase):
         self.assertIn("Reconciliation", rep)
 
 
+class TestResolverCacheOnly(unittest.TestCase):
+    def test_cache_only_wendet_cache_an_ohne_netz(self):
+        # R4 (--offline): gecachte Direktlinks anwenden, bei Miss None — NIE eine Session öffnen.
+        import pathlib
+        import tempfile
+        from pipeline.control import state
+        from pipeline.enrich.mastr_resolve import EvidenzResolver
+        with tempfile.TemporaryDirectory() as d:
+            con = state.connect(pathlib.Path(d) / "s.db")
+            con.execute("INSERT INTO mastr_url_cache(einheit_mastr_nr, detail_id, resolved_at) "
+                        "VALUES('SEE1', 12345, '2026-06-16')")
+            con.commit()
+            r = EvidenzResolver(cache_con=con)
+            self.assertEqual(r.resolve_id("SEE1", cache_only=True), 12345)   # Cache-Treffer
+            self.assertIsNone(r.resolve_id("SEE_MISS", cache_only=True))     # Miss -> None
+            self.assertIsNone(r._session)                                    # Session NIE geöffnet
+            con.close()
+
+
+class TestRecordMetrics(unittest.TestCase):
+    def test_record_metrics_schreibt_trichter(self):
+        # R4: run_region/_record_metrics speist das Dashboard-Monitoring (idempotent).
+        import pathlib
+        import tempfile
+        from pipeline import deliver as D
+        from pipeline.control import metrics, state
+        with tempfile.TemporaryDirectory() as d:
+            con = state.connect(pathlib.Path(d) / "s.db")
+            b = Buckets("Münsterland", gebiet_id="muensterland", roh=312,
+                        lieferbar=[_r("S1", "ABR1", "A", dv=True)],
+                        pending=[_r("S2", "ABR2", "B")], namenlos=[_r("S3", "ABR3", None)])
+            D._record_metrics(b, con)
+            rows = {r["metrik"]: r["summe"] for r in metrics.aggregate(con)}
+            self.assertEqual(rows["signale"], 312)
+            self.assertEqual(rows["lieferbar"], 1)
+            self.assertEqual(rows["pending_qa"], 1)
+            self.assertEqual(rows["namenlos"], 1)
+            self.assertEqual(rows["dv_flag"], 1)
+            con.close()
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

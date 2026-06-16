@@ -73,19 +73,32 @@ _RECHTSFORM_FLAG: dict[str, str] = {
     "ggmbh": "VEREIN_PRUEFEN",
     "eg": "VEREIN_PRUEFEN",
     "stiftung des privatrechts": "VEREIN_PRUEFEN",
+    "stiftung des öffentlichen rechts": "OEFFENTLICH_PRUEFEN",
     "vvag": "VEREIN_PRUEFEN",
     "körperschaft des öffentlichen rechts": "OEFFENTLICH_PRUEFEN",
     "anstalt des öffentlichen rechts": "OEFFENTLICH_PRUEFEN",
-    "stiftung des öffentlichen rechts": "OEFFENTLICH_PRUEFEN",
     "eigenbetrieb": "OEFFENTLICH_PRUEFEN",
-    "ag": "KETTE_PRUEFEN",
-    "se": "KETTE_PRUEFEN",
 }
+# Aktien-/Konzernformen (auch Misch-/KGaA) tokenbasiert -> KETTE. Fängt AG/SE/KGaA, AG & Co. KGaA,
+# SE ＆ Co. KG, GmbH & Co. KGaA ohne jede Variante einzeln pflegen zu müssen (R4-Befund).
+_RECHTSFORM_KONZERN = re.compile(r"\b(ag|se|kgaa)\b")
 
 
 def _rechtsform_flag(rechtsform: object) -> str | None:
-    """Exakter (case-insensitiver) Katalog-Treffer der Rechtsform -> QA-Flag, sonst None."""
-    return _RECHTSFORM_FLAG.get(str(rechtsform or "").strip().lower())
+    """Katalog-Rechtsform -> QA-Flag, sonst None.
+
+    Normalisiert robust gegen Katalog-Drift (R4-Befund): Voll-Breiten-'＆' -> '&', interner
+    Whitespace kollabiert (der echte Wert 'Stiftung  des öffentlichen Rechts' trägt ZWEI Leerzeichen),
+    getrimmt + lower. Erst exakter Verein/öffentlich-Treffer, dann tokenbasiert AG/SE/KGaA -> KETTE.
+    """
+    s = re.sub(r"\s+", " ", str(rechtsform or "").replace("＆", "&")).strip().lower()
+    if not s:
+        return None
+    if s in _RECHTSFORM_FLAG:
+        return _RECHTSFORM_FLAG[s]
+    if _RECHTSFORM_KONZERN.search(s):
+        return "KETTE_PRUEFEN"
+    return None
 
 # §2.1: Firmen-/Rechtsform-/Branchen-Tokens, deren Vorkommen einen Namen als FIRMA (nicht
 # bloße Person) ausweist — Gegenprobe zum Personennamen-Muster.

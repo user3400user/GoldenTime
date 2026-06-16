@@ -86,13 +86,19 @@ class EvidenzResolver:
                 log.debug("Cache-Schreiben für %s fehlgeschlagen: %s", see, e)
 
     # --- Auflösung ---
-    def resolve_id(self, see: str) -> int | None:
-        """SEE -> interne MaStR-ID (oder None, wenn nicht auflösbar/offline)."""
+    def resolve_id(self, see: str, *, cache_only: bool = False) -> int | None:
+        """SEE -> interne MaStR-ID (oder None, wenn nicht auflösbar/offline).
+
+        ``cache_only`` (Offline-Demo): NUR den Cache anwenden, keine Session öffnen — so behalten
+        bereits aufgelöste Leads ihren Direktlink, auch wenn ohne Netz gefahren wird (R4-Befund).
+        """
         if not see:
             return None
         cached = self._cache_get(see)
         if cached is not _MISS:
             return cached
+        if cache_only:
+            return None
         detail_id = None
         s = self._session_or_none()
         if s is not None:
@@ -110,11 +116,14 @@ class EvidenzResolver:
         self._cache_put(see, detail_id)
         return detail_id
 
-    def resolve_records(self, records) -> int:
-        """Setze ``record.detail_id`` für jeden Record. Gibt die Zahl aufgelöster Direktlinks zurück."""
+    def resolve_records(self, records, *, cache_only: bool = False) -> int:
+        """Setze ``record.detail_id`` für jeden Record. Gibt die Zahl aufgelöster Direktlinks zurück.
+
+        ``cache_only`` reicht den Offline-Modus an ``resolve_id`` durch (nur Cache, kein Netz).
+        """
         n = 0
         for r in records:
-            mid = self.resolve_id(getattr(r, "einheit_mastr_nr", None))
+            mid = self.resolve_id(getattr(r, "einheit_mastr_nr", None), cache_only=cache_only)
             if mid:
                 r.detail_id = mid
                 n += 1

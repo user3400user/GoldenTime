@@ -11,6 +11,7 @@ from __future__ import annotations
 import datetime as dt
 from dataclasses import dataclass, field
 
+from .control import metrics
 from .enrich import mastr_resolve
 from .qualify import hierarchy, qa_gate
 from .speicher_check import GEPLANT, build_storage_index
@@ -67,9 +68,31 @@ def run_region(con, qa_con, *, plz_prefixes, region, gebiet_id="", resolve=True,
         else:
             b.pending.append(r)
     b.lieferbar.sort(key=lambda r: (r.dv_flag, r.kwp or 0), reverse=True)
-    if resolve and b.lieferbar:
-        mastr_resolve.EvidenzResolver(cache_con=qa_con).resolve_records(b.lieferbar)
+    # Evidenz-Direktlinks setzen. Im Offline-Modus (resolve=False) GECACHTE IDs trotzdem anwenden
+    # (cache_only) — sonst fällt jeder Nachweis auf die leere Suchmaske zurück, obwohl die ID im
+    # Cache liegt (R4-Befund, demo-kritisch bei --offline).
+    if b.lieferbar:
+        mastr_resolve.EvidenzResolver(cache_con=qa_con).resolve_records(
+            b.lieferbar, cache_only=not resolve)
+    _record_metrics(b, qa_con)
     return b
+
+
+def _record_metrics(b: Buckets, qa_con, *, trigger: str = "T2") -> None:
+    """Trichter-Kennzahlen je Gebiet in pipeline_state.db (Dashboard-Monitoring) — idempotent.
+
+    R4-Befund: bisher schrieb NUR ``cmd_signals`` Metriken; gate-demo/liefern/mengen ließen das
+    Monitoring stale/lückenhaft. ``metrics.record`` ist idempotent je (woche,gebiet,trigger,metrik),
+    Mehrfachläufe ersetzen also nur. Ohne gebiet_id (anonyme Buckets in Tests) wird nichts geschrieben.
+    """
+    if not b.gebiet_id:
+        return
+    woche = metrics.iso_woche()
+    for metrik, wert in (("signale", b.roh), ("lieferbar", len(b.lieferbar)),
+                         ("pending_qa", len(b.pending)), ("namenlos", len(b.namenlos)),
+                         ("speicher_geplant", len(b.speicher_geplant)),
+                         ("dv_flag", sum(r.dv_flag for r in b.lieferbar))):
+        metrics.record(qa_con, metrik=metrik, wert=wert, woche=woche, gebiet=b.gebiet_id, trigger=trigger)
 
 
 def liefer_mail(b: Buckets, *, kaeufer: str = "", funktion: str = "Speicher-Installateur",

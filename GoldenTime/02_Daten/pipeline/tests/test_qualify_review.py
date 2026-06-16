@@ -170,6 +170,18 @@ class TestEnrichPrecedence(unittest.TestCase):
         self.assertIn("OEFFENTLICH_PRUEFEN", f["SEE3"])    # AöR rein aus Rechtsform (Name neutral)
         self.assertEqual(f["SEE4"], set())                 # normale GmbH -> kein Flag, bleibt lieferbar
 
+    def test_rechtsform_flag_robust_whitespace_und_konzern(self):
+        # R4: Katalog-Drift abfangen — der echte Wert hat ZWEI Leerzeichen; Voll-Breiten-&; Misch-/KGaA.
+        self.assertEqual(H._rechtsform_flag("Stiftung  des öffentlichen Rechts"), "OEFFENTLICH_PRUEFEN")
+        self.assertEqual(H._rechtsform_flag("Stiftung des Privatrechts"), "VEREIN_PRUEFEN")
+        self.assertEqual(H._rechtsform_flag("gGmbH"), "VEREIN_PRUEFEN")
+        self.assertEqual(H._rechtsform_flag("AG & Co. KGaA"), "KETTE_PRUEFEN")
+        self.assertEqual(H._rechtsform_flag("SE ＆ Co. KG"), "KETTE_PRUEFEN")     # Voll-Breiten-&
+        self.assertEqual(H._rechtsform_flag("GmbH & Co. KGaA"), "KETTE_PRUEFEN")
+        self.assertIsNone(H._rechtsform_flag("GmbH & Co. KG"))                    # kein Konzernsignal
+        self.assertIsNone(H._rechtsform_flag("GmbH"))
+        self.assertIsNone(H._rechtsform_flag(None))
+
 
 class TestStorageBetriebsstatus(unittest.TestCase):
     def _db(self):
