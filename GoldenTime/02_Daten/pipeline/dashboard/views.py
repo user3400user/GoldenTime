@@ -177,16 +177,37 @@ def _exklusivitaet_tabelle(ledger_rows: list[dict]) -> str:
     )
 
 
+def _qa_queue_tabelle(qa_rows: list) -> str:
+    """Offene QA-Queue (Grenzfälle): EinheitMastrNummer · Betreiber (ABR) · Flags. Entscheidung via CLI."""
+    if not qa_rows:
+        body = '<tr><td colspan="3" class="muted">Keine offenen QA-Fälle.</td></tr>'
+    else:
+        body = "".join(
+            f"<tr><td><code>{_esc(r['einheit_mastr_nr'])}</code></td>"
+            f"<td>{_esc(r['betreiber_mastr_nr'])}</td>"
+            f"<td>{_esc(r['flags_at_review'])}</td></tr>"
+            for r in qa_rows
+        )
+    return (
+        f"<h2>QA-Queue (offene Grenzfälle: {len(qa_rows)})</h2>"
+        '<p class="muted">Entscheiden via CLI: <code>qa approve &lt;SEE&gt;</code> · '
+        '<code>qa reject &lt;SEE&gt; --grund …</code> · <code>qa approve-abr &lt;ABR&gt;</code> (Sammel).</p>'
+        "<table><thead><tr><th>EinheitMastrNummer</th><th>Betreiber (ABR)</th><th>Flags</th></tr></thead>"
+        f"<tbody>{body}</tbody></table>"
+    )
+
+
 def render_dashboard(
     store: ConfigStore,
     metrics_rows: list[dict],
     ledger_rows: list[dict],
+    qa_rows: list | None = None,
 ) -> str:
     """Vollständige Dashboard-Seite als HTML-String (reine Funktion, testbar ohne Server).
 
-    Setzt sich aus fünf Blöcken zusammen: Trigger-Schalter, Modul-Schalter, Gebiete-Tabelle,
-    Monitoring (aus ``metrics.aggregate``) und Exklusivität (aus ``ledger.overview``). ``store``
-    liefert auch die Provenance-Fußzeile (updated_at/updated_by) — Audit, wer zuletzt geschaltet hat.
+    Setzt sich aus sechs Blöcken zusammen: Trigger-Schalter, Modul-Schalter, Gebiete-Tabelle,
+    Monitoring (aus ``metrics.aggregate``), Exklusivität (aus ``ledger.overview``) und QA-Queue
+    (aus ``state.qa_pending``). ``store`` liefert die Provenance-Fußzeile (updated_at/updated_by).
     """
     fuss = ""
     if store.updated_at or store.updated_by:
@@ -204,6 +225,7 @@ def render_dashboard(
         + _modul_tabelle(store)
         + _gebiete_tabelle(store)
         + _monitoring_tabelle(metrics_rows)
+        + _qa_queue_tabelle(qa_rows or [])
         + _exklusivitaet_tabelle(ledger_rows)
         + fuss
         + "</body></html>"

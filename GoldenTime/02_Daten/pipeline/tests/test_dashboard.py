@@ -207,5 +207,30 @@ class TestApplyToggle(unittest.TestCase):
             self.assertEqual(reloaded.updated_by, "dashboard")
 
 
+class TestQaQueueView(unittest.TestCase):
+    def test_state_qa_pending_read(self):
+        with tempfile.TemporaryDirectory() as d:
+            con = state.connect(Path(d) / "state.db")
+            con.execute("INSERT INTO qa_decision(einheit_mastr_nr,betreiber_mastr_nr,status,"
+                        "flags_at_review,fingerprint) VALUES(?,?,?,?,?)",
+                        ("SEE1", "ABR1", "pending", "ENERGIE_FIRMA_PRUEFEN", "fp"))
+            con.execute("INSERT INTO qa_decision(einheit_mastr_nr,status,fingerprint) "
+                        "VALUES(?,?,?)", ("SEE2", "approved", "fp2"))
+            con.commit()
+            rows = state.qa_pending(con)
+            self.assertEqual([r["einheit_mastr_nr"] for r in rows], ["SEE1"])   # nur pending
+            con.close()
+
+    def test_dashboard_renders_qa_section(self):
+        qa = [{"einheit_mastr_nr": "SEE1", "betreiber_mastr_nr": "ABR1",
+               "flags_at_review": "ENERGIE_FIRMA_PRUEFEN"}]
+        html = views.render_dashboard(DEFAULT_STORE, [], [], qa)
+        self.assertIn("QA-Queue (offene Grenzfälle: 1)", html)
+        self.assertIn("SEE1", html)
+        self.assertIn("ENERGIE_FIRMA_PRUEFEN", html)
+        # ohne qa_rows weiterhin ok (Backward-Compat)
+        self.assertIn("QA-Queue (offene Grenzfälle: 0)", views.render_dashboard(DEFAULT_STORE, [], []))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

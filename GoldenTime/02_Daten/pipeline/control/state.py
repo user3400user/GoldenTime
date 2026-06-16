@@ -94,6 +94,17 @@ def init_schema(con: sqlite3.Connection) -> None:
     con.commit()
 
 
+def qa_pending(con: sqlite3.Connection, limit: int = 100) -> list:
+    """Offene QA-Queue (pending-Grenzfälle) lesen — Control-Layer-Read fürs Dashboard.
+
+    Bewusst hier (control), NICHT über qualify.qa_gate: das Dashboard importiert KEINE Pipeline-Logik
+    (Briefing §6, einseitige Kopplung). Reine Lese-Operation auf der qa_decision-Tabelle.
+    """
+    return list(con.execute(
+        "SELECT einheit_mastr_nr, betreiber_mastr_nr, flags_at_review, status, entschieden_am "
+        "FROM qa_decision WHERE status = 'pending' ORDER BY einheit_mastr_nr LIMIT ?", (int(limit),)))
+
+
 def connect_readonly(db_path: Path | str | None = None) -> sqlite3.Connection:
     """Nur-Lese-Verbindung fürs Dashboard (URI ?mode=ro). Fällt auf normal zurück, wenn die DB fehlt."""
     path = Path(db_path or config.PIPELINE_DB_PATH)
