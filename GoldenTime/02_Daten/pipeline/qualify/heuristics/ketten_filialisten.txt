@@ -1,0 +1,19 @@
+# Ketten / Filialisten — Substring-Muster (case-insensitiv gegen Firmenname).
+# Eine Zeile = ein Muster; '#'-Zeilen und Leerzeilen werden ignoriert.
+# Treffer -> Flag KETTE_PRUEFEN: Filialist mit zentralem Einkauf -> Lead-Wert je Standort
+# fraglich (Entscheidung fällt in der Zentrale). Bewusst KONKRETE Marken statt pauschalem
+# 'gmbh & co. kg' (das trifft zu viele echte Mittelständler). Mensch-QA entscheidet.
+lidl
+aldi
+rewe
+edeka
+kaufland
+netto
+penny
+dm-drogerie
+rossmann
+mcdonald
+burger king
+obi
+bauhaus
+hornbach

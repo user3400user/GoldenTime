@@ -1,0 +1,14 @@
+# Öffentliche Hand / Kommunalbetriebe — Substring-Muster (case-insensitiv gegen Firmenname).
+# Eine Zeile = ein Muster; '#'-Zeilen und Leerzeilen werden ignoriert.
+# Treffer -> Flag OEFFENTLICH_PRUEFEN (Mensch-QA entscheidet, KEINE harte Streichung —
+# z.B. kommunale Eigenbetriebe können trotzdem Käufer sein).
+stadtverwaltung
+gemeinde
+landkreis
+kommunal
+stadtwerke
+zweckverband
+landesbetrieb
+bundesanstalt
+körperschaft
+anstalt des öffentlichen rechts

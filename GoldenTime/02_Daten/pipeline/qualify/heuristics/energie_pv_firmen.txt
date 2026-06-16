@@ -1,0 +1,16 @@
+# Energie- / PV- / Speicher-Branche — Substring-Muster (case-insensitiv gegen Firmenname).
+# Eine Zeile = ein Muster; '#'-Zeilen und Leerzeilen werden ignoriert.
+# Treffer -> Flag ENERGIE_FIRMA_PRUEFEN: Branchenakteur kennt Speicher selbst (Eigenbedarf
+# oder Wettbewerber) -> i.d.R. kein Lead, aber Mensch-QA entscheidet (z.B. Dachdecker mit
+# 'solar' im Namen ist evtl. doch Endkunde).
+energie
+solar
+photovoltaik
+windpark
+windenergie
+energiegenossenschaft
+solarpark
+ökostrom
+green energy
+energieversorgung
+speicher

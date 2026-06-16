@@ -1,0 +1,24 @@
+{
+  "_comment": "GoldenTime Config-Store (D3). Geschrieben vom Admin-Dashboard, gelesen von Pipeline + Dashboard. Manuell editierbar; muss schema_version + Validierung bestehen. Default-Aus exakt nach Build-Briefing v2 §3 / Expansions-Analyse §3.",
+  "schema_version": 1,
+  "updated_at": "2026-06-16T00:00:00+00:00",
+  "updated_by": "default",
+  "triggers": {
+    "T1": {"enabled": true,  "label": "Neuregistrierung PV o. Speicher"},
+    "T2": {"enabled": true,  "label": "Post-EEG 2006/07"},
+    "T3": {"enabled": true,  "label": "Bestand o. Speicher"},
+    "T4": {"enabled": true,  "label": "Speicher-Retrofit"},
+    "T5": {"enabled": false, "label": "Betreiberwechsel (gebaut, default aus)"},
+    "T6": {"enabled": false, "label": "Stilllegung (gebaut, default aus)"},
+    "DV_FLAG": {"enabled": true, "label": "Direktvermarkter >=100 kWp"},
+    "PV_ERWEITERUNG": {"enabled": false, "label": "Zweit-Einheit an Bestands-ABR (default aus)"}
+  },
+  "modules": {
+    "anreicherung": {"enabled": false, "label": "Entscheider/Kontakt — scharf erst nach Call + Lizenz"}
+  },
+  "gebiete": [
+    {"id": "muensterland", "name": "Münsterland", "enabled": true,  "plz_prefixes": ["48", "59"], "trigger_overrides": {}},
+    {"id": "osnabrueck",   "name": "Raum Osnabrück", "enabled": true,  "plz_prefixes": ["49"], "trigger_overrides": {}},
+    {"id": "stuttgart",    "name": "Raum Stuttgart", "enabled": false, "plz_prefixes": ["70", "71"], "trigger_overrides": {}}
+  ]
+}

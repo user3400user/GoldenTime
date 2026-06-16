@@ -1,0 +1,14 @@
+# Vereine / Stiftungen / Genossenschaften — Substring-Muster (case-insensitiv gegen Firmenname).
+# Eine Zeile = ein Muster; '#'-Zeilen und Leerzeilen werden ignoriert.
+# Treffer -> Flag VEREIN_PRUEFEN: oft kein klassischer Gewerbe-Entscheider / Non-Profit-Budget.
+# Mensch-QA entscheidet (große Genossenschaften/Wohnungsbau können sehr wohl Käufer sein).
+e.v.
+e. v.
+verein
+stiftung
+genossenschaft
+gemeinnützig
+kirchengemeinde
+pfarrei
+diakonie
+caritas

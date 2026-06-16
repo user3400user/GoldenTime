@@ -9,6 +9,14 @@ push.sh
 __pycache__/
 *.pyc
 .venv/
+# Build-/Pipeline-Artefakte (lokal, nicht committen)
+*.log
+*.db
+leads_*.csv
+signals_*.csv
+02_Daten/snapshots/
+# Ausnahme: der Config-Store IST versioniert (D3, git-Diff/blame/revert)
+!02_Daten/pipeline/config_store.json
 # OS
 .DS_Store
 Thumbs.db

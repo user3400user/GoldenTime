@@ -23,6 +23,25 @@ DEFAULT_DB_PATH = Path(
     )
 )
 
+# --- Eigener operativer State (D1: 3-DB-Trennung) --------------------------
+# pipeline_state.db hält QA + Exklusivitäts-Ledger + Metriken; GETRENNT von der
+# Export-DB, die open-mastr je build-db KOMPLETT neu baut (sonst wäre der State weg).
+PIPELINE_DB_PATH = Path(
+    os.environ.get("PIPELINE_DB_PATH", str(Path(__file__).resolve().parent.parent / "pipeline_state.db"))
+)
+# Versionierte Wochen-Snapshots (D2): dated, schlank, eigener Ordner.
+SNAPSHOT_DIR = Path(
+    os.environ.get("MASTR_SNAPSHOT_DIR", str(Path(__file__).resolve().parent.parent / "snapshots"))
+)
+SNAPSHOT_RETENTION_WEEKS = 8     # rollende Wochen (Diff braucht >=2)
+SNAPSHOT_ANKER_MONATE = 13       # zusätzlich monatliche Anker für T5/T6-Langhistorie
+# Config-Store (D3): versionierte JSON, von Pipeline + Dashboard gelesen.
+CONFIG_STORE_PATH = Path(
+    os.environ.get("CONFIG_STORE_PATH", str(Path(__file__).resolve().parent / "config_store.json"))
+)
+# DB-Engine (D1): 'sqlite' jetzt; Postgres als ENV-Switch erst bei Hosting/Mehrschreiber.
+DB_ENGINE = os.environ.get("MASTR_DB_ENGINE", "sqlite")
+
 # --- open-mastr Technologie-/Objekt-Auswahl (download(data=...)) -----------
 # Nur diese Datensätze laden statt aller ~30 Objekte: solar + storage genügen für den
 # ABR-Anywhere-Check; location (co-lokal) + market (gewerblich/PersonenArt) ergänzen.
@@ -46,8 +65,8 @@ COL: dict[str, tuple[str, ...]] = {
     "einheit_nr": ("EinheitMastrNummer",),
     "abr": ("AnlagenbetreiberMastrNummer",),
     "lokation_nr": ("LokationMaStRNummer", "LokationMastrNummer"),
-    "betreiber_name": ("AnlagenbetreiberName", "Anlagenbetreiber"),
-    "personenart": ("AnlagenbetreiberPersonenArt", "Personenart"),
+    "betreiber_name": ("AnlagenbetreiberName", "Anlagenbetreiber"),  # Phase 0: NICHT im Export auf der Einheit -> via firmenname (market_actors)
+    "personenart": ("Personenart", "AnlagenbetreiberPersonenArt"),   # Phase 0: nur auf market_actors
     "plz": ("Postleitzahl",),
     "ort": ("Ort",),
     "bundesland": ("Bundesland",),
@@ -61,17 +80,30 @@ COL: dict[str, tuple[str, ...]] = {
     "speicher_gleicher_ort": ("SpeicherAmGleichenOrt",),
     "gem_solar_nr": ("GemeinsamRegistrierteSolareinheitMastrNummer",),
     "eeg_nr": ("EegMaStRNummer", "EegMastrNummer"),
-    "eeg_inbetriebnahme": ("EegInbetriebnahmedatum",),
+    "eeg_inbetriebnahme": ("EegInbetriebnahmedatum",),   # auf solar_eeg (Join via eeg_nr), Phase 0: 100% Coverage
+    # --- T6 Stilllegung (Phase 0: auf solar_extended + storage_extended belegt) ----
+    "stilllegung_endg": ("DatumEndgueltigeStilllegung",),
+    "stilllegung_vorueb": ("DatumBeginnVoruebergehendeStilllegung",),
+    "wiederaufnahme": ("DatumWiederaufnahmeBetrieb",),
+    # --- Marktakteure-Join: Betreibername/PersonenArt liegen NICHT auf der Einheit
+    #     (Phase 0 verifiziert), sondern auf market_actors. Join: Einheit.abr -> market_actors.MastrNummer.
+    "firmenname": ("Firmenname",),
+    "markt_mastr_nr": ("MastrNummer",),
 }
 
-# --- Katalog-Codes (MaStR; gemessen R3 N+1) --------------------------------
+# --- Katalog-Werte (Phase 0, 16.06. verifiziert) ---------------------------
+# Die open-mastr *_extended-Tabellen lösen Katalog-Codes bereits zu deutschem
+# KLARTEXT auf: Bundesland='Bayern', Einspeisungsart='Volleinspeisung',
+# EinheitBetriebsstatus='In Betrieb'. -> Region über PLZ filtern (nicht Bundesland-Code).
+BETRIEBSSTATUS_IN_BETRIEB = "In Betrieb"   # Klartext im Export (Web-JSON war Code 35)
+# Reine Web-JSON-Codes (NICHT für Export-Queries; *_extended ist Klartext):
 ENERGIETRAEGER_SOLAR = 2495
 ENERGIETRAEGER_SPEICHER = 2496
-BETRIEBSSTATUS_IN_BETRIEB = 35  # "In Betrieb"
 
 # --- Produkt-Konstanten (Lead-Spec / STATE §6) -----------------------------
 KWP_MIN = 30.0
 KWP_MAX = 750.0              # grober Solarpark-Schutz; P1: Lage-Filter, dann anheben
+DV_FLAG_MIN_KWP = 100.0     # Direktvermarktungs-Pflicht ab 100 kWp (DV-Flag, Multiplikator)
 FRISCHE_FENSTER_TAGE = 45    # Standard 30–45 (Dichte-Hebel)
 # R3 §7b: reg_datum allein ist kein Neubau-Beweis. Liegt die Inbetriebnahme deutlich
 # vor der Registrierung -> Nachregistrierungs-Verdacht (Frist bis 2021) -> flaggen.
