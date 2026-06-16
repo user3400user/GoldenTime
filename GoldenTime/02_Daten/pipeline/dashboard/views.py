@@ -40,6 +40,11 @@ def _esc(value: object) -> str:
     return html.escape("" if value is None else str(value))
 
 
+def _num(value: object) -> str:
+    """Zahl knapp formatieren (Ganzzahl ohne Dezimalen), None → leer."""
+    return "" if value is None else f"{value:g}"
+
+
 def _status_zelle(enabled: bool) -> str:
     """Einheitliche AN/AUS-Zelle (grün/rot) für alle Schalter-Tabellen."""
     return ('<span class="an">AN</span>' if enabled
@@ -115,41 +120,73 @@ def _gebiete_tabelle(store: ConfigStore) -> str:
         # Overrides können nur ABschalten (config_store-Semantik) -> nur die False-Einträge zeigen.
         aus = [k for k, v in overrides.items() if v is False]
         ov_txt = ", ".join(aus) if aus else "—"
+        # Effektiv aktive Trigger je Gebiet (global-Schalter ∧ Gebiets-Override) = Wahrheit, was
+        # hier wirklich läuft — sonst muss der Operator global + Override im Kopf verrechnen.
+        aktiv = [t for t in VALID_TRIGGERS if store.effective_trigger(gid, t)]
+        aktiv_txt = ", ".join(aktiv) if aktiv else "—"
         zeilen.append(
             f"<tr><td><code>{_esc(gid)}</code></td><td>{_esc(g.get('name'))}</td>"
             f"<td>{_status_zelle(enabled)}</td><td>{_esc(prefixes)}</td>"
-            f"<td>{_esc(ov_txt)}</td>"
+            f"<td>{_esc(ov_txt)}</td><td class=\"muted\">{_esc(aktiv_txt)}</td>"
             f"<td>{_toggle_form('gebiet', gid, enabled)}</td></tr>"
         )
     return (
         "<h2>Gebiete</h2>"
         "<table><thead><tr><th>ID</th><th>Name</th><th>Zustand</th>"
-        "<th>PLZ-Präfixe</th><th>Trigger aus (Override)</th><th>Aktion</th></tr></thead>"
+        "<th>PLZ-Präfixe</th><th>Trigger aus (Override)</th><th>aktive Trigger</th>"
+        "<th>Aktion</th></tr></thead>"
         f"<tbody>{''.join(zeilen)}</tbody></table>"
     )
 
 
+# Trichter-Spalten in Lesereihenfolge (Metrik-Namen wie in cli.py gesetzt). 'signale' -> 'lieferbar'.
+_TRICHTER = ("signale", "namenlos", "pending_qa", "lieferbar", "dv_flag", "speicher_geplant")
+_TRICHTER_KOPF = ("signale", "namenlos", "QA-pend", "lieferbar", "DV", "geplant")
+
+
 def _monitoring_tabelle(metrics_rows: list[dict]) -> str:
-    """Monitoring je Gebiet × Trigger × Woche × Metrik (Volumen/Frische) aus metrics.aggregate."""
+    """Monitoring als Trichter je Gebiet × Trigger × Woche: Metriken als Spalten + Ausbeute% + Frische.
+
+    Pivotiert die langen ``metrics.aggregate``-Zeilen (eine je Metrik) zu EINER Zeile je Dimension —
+    so liest der Operator den ganzen Trichter (signale → … → lieferbar) auf einen Blick. Ausbeute =
+    lieferbar/signale (kaufmännisch relevanteste Kennzahl); Frische = jüngste ``letzte_erfassung``.
+    """
+    spaltenzahl = 3 + len(_TRICHTER) + 2  # Woche/Gebiet/Trigger + Metriken + Ausbeute + Frische
     if not metrics_rows:
-        body = '<tr><td colspan="5" class="muted">Noch keine Metriken erfasst.</td></tr>'
+        body = f'<tr><td colspan="{spaltenzahl}" class="muted">Noch keine Metriken erfasst.</td></tr>'
     else:
-        zeilen = []
+        gruppen: dict = {}
+        reihenfolge: list = []
         for r in metrics_rows:
-            wert = r.get("summe")
-            wert_txt = "" if wert is None else f"{wert:g}"
+            key = (r.get("woche"), r.get("gebiet"), r.get("trigger"))
+            if key not in gruppen:
+                gruppen[key] = {"metriken": {}, "frische": None}
+                reihenfolge.append(key)
+            g = gruppen[key]
+            if r.get("summe") is not None:
+                g["metriken"][r.get("metrik")] = r["summe"]
+            le = r.get("letzte_erfassung")
+            if le and (g["frische"] is None or le > g["frische"]):
+                g["frische"] = le
+        zeilen = []
+        for key in reihenfolge:
+            woche, gebiet, trigger = key
+            m = gruppen[key]["metriken"]
+            zellen = "".join(f"<td>{_esc(_num(m.get(s)))}</td>" for s in _TRICHTER)
+            signale, lieferbar = m.get("signale") or 0, m.get("lieferbar") or 0
+            ausbeute = f"{100 * lieferbar / signale:.1f}%" if signale else "—"
+            frische = gruppen[key]["frische"] or "—"
             zeilen.append(
-                f"<tr><td>{_esc(r.get('woche'))}</td>"
-                f"<td>{_esc(r.get('gebiet') or '—')}</td>"
-                f"<td>{_esc(r.get('trigger') or '—')}</td>"
-                f"<td>{_esc(r.get('metrik'))}</td>"
-                f"<td>{_esc(wert_txt)}</td></tr>"
+                f"<tr><td>{_esc(woche)}</td><td>{_esc(gebiet or '—')}</td>"
+                f"<td>{_esc(trigger or '—')}</td>{zellen}"
+                f"<td>{_esc(ausbeute)}</td><td class=\"muted\">{_esc(frische)}</td></tr>"
             )
         body = "".join(zeilen)
+    kopf = "".join(f"<th>{_esc(k)}</th>" for k in
+                   ("Woche", "Gebiet", "Trigger", *_TRICHTER_KOPF, "Ausbeute", "Frische"))
     return (
-        "<h2>Monitoring</h2>"
-        "<table><thead><tr><th>Woche</th><th>Gebiet</th><th>Trigger</th>"
-        "<th>Metrik</th><th>Wert</th></tr></thead>"
+        "<h2>Monitoring (Trichter je Gebiet × Trigger)</h2>"
+        f"<table><thead><tr>{kopf}</tr></thead>"
         f"<tbody>{body}</tbody></table>"
     )
 

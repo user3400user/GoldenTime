@@ -87,6 +87,25 @@ class TestRenderDashboard(unittest.TestCase):
         html = views.render_dashboard(store, [], [])
         self.assertIn("Trigger aus (Override)", html)
 
+    def test_monitoring_pivot_trichter_und_ausbeute(self):
+        # R3c: mehrere Metriken EINER Dimension → eine Trichter-Zeile + Ausbeute lieferbar/signale.
+        rows = [
+            {"woche": "2026-W25", "gebiet": "muensterland", "trigger": "T2", "metrik": "signale",
+             "summe": 312.0, "anzahl": 1, "letzte_erfassung": "2026-06-16T10:00:00+00:00"},
+            {"woche": "2026-W25", "gebiet": "muensterland", "trigger": "T2", "metrik": "lieferbar",
+             "summe": 41.0, "anzahl": 1, "letzte_erfassung": "2026-06-16T10:00:00+00:00"},
+        ]
+        html = views.render_dashboard(DEFAULT_STORE, rows, [])
+        self.assertIn("Trichter", html)        # pivotierte Monitoring-Überschrift
+        self.assertIn("Ausbeute", html)
+        self.assertIn("13.1%", html)           # 41/312 = 13,1 % Konversion
+        self.assertIn("2026-06-16T10:00:00+00:00", html)   # Frische/letzte_erfassung sichtbar
+
+    def test_gebiete_effektive_trigger_spalte(self):
+        # R3c: neue Spalte 'aktive Trigger' (effective_trigger je Gebiet) im Gebiete-Block.
+        html = views.render_dashboard(DEFAULT_STORE, [], [])
+        self.assertIn("aktive Trigger", html)
+
 
 class TestMetricsRoundtrip(unittest.TestCase):
     def setUp(self):
