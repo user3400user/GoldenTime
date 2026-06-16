@@ -95,7 +95,7 @@ aus dem Quellcode vermuteten deutschen XSD-Namen waren over-thought — `inspect
 - `02_Daten/pipeline/` — **PULL steht** (Export-Adapter + ABR-Speicher-Anywhere + Normalisierung + CLI).
   **Neu (Session 1):** `signal/` (K5 SignalRecord + from_lead, Konfidenz=Pflicht) · `control/` (D3 config_store
   + D1/D5/D6 `pipeline_state.db`, WAL) · `config_store.json` (versioniert). **36 Tests grün** (stdlib).
-  **Gebaut + integriert + ZWEIT-REVIEW-gehärtet, 183 Tests grün:** register(D4) · snapshot+diff(K2) ·
+  **Gebaut + integriert + ZWEIT-REVIEW-gehärtet, 188 Tests grün:** register(D4) · snapshot+diff(K2) ·
   triggers cohort/diff_based(K3) · qualify+QA(K4/D5) · ledger(K6) · enrich(K7) + evidenz-resolver ·
   dashboard(K8) · deliver(TEIL 5). CLI: `signals`/`qa`/`snapshot`/`diff`/`ledger`/`dashboard`/`liefern`/
   `mengen`/`evidenz-check`/**`weekly`**/**`gate-demo`**. Eigene `pipeline/README.md`.
@@ -145,9 +145,22 @@ aus dem Quellcode vermuteten deutschen XSD-Namen waren over-thought — `inspect
     66→68** (die 2 sind die o.g. gGmbH+e.V. → gehören in QA, nicht Auto-Lieferung). Flag, nie Streichung.
   - **Demo-Artefakt R2 neu erzeugt + verifiziert:** `gate-demo muensterland,osnabrueck` → 141 Evidenz-
     Direktlinks, **0 tote SEE-Links**, Mengen-Report reconciliert, Liefer-Mails mit Disclaimer.
-  - **PARKED (Dashboard-Politur, analysiert, ready):** Monitoring als Gebiet×Trigger-Matrix, Trichter-Ausbeute %,
-    Frische/letzte_erfassung, `effective_trigger` je Gebiet sichtbar, `latest_by_dimension` verdrahten,
-    Liefer-Protokoll-Ansicht (delivery-Tabelle; Schreiber `record_delivery` wird vom CLI-Pfad NIE aufgerufen → leer).
+  - **R3c Dashboard-Politur (85aa73e):** Monitoring jetzt Trichter je Gebiet×Trigger (Metriken als Spalten)
+    + Ausbeute % + Frische; Gebiete-Block zeigt `effective_trigger`. (Nicht umgesetzt: `latest_by_dimension`
+    = redundant; Liefer-Protokoll-Ansicht = `record_delivery` ungenutzt → leer.)
+- **Autonomer R4-Loop (16.06., finale Review-Workflow + Direkt-Fixes, 188 Tests grün, Commit `eb316b7`):**
+  5-Dim-Review (5 Skeptiker-verifiziert) fand 7 Rest-Defekte → behoben:
+  - **[HIGH, business-shifting] Rechtsform-Katalog-Drift:** echter Wert `'Stiftung  des öffentlichen Rechts'`
+    hat ZWEI Leerzeichen → Key matchte nie; `_rechtsform_flag` kollabiert jetzt Whitespace + normalisiert
+    Voll-Breiten-`＆`. **[MEDIUM]** AG/SE/KGaA-Mischformen jetzt tokenbasiert (`re:\b(ag|se|kgaa)\b`→KETTE).
+    **Münsterland-Impact: 0** (gelieferte Gebiete sind namensgedeckt; reine Abwehr-/Drift-Härtung).
+  - **[DEMO-KRITISCH] `--offline` verwarf gecachte Evidenz-Direktlinks** → leere Suchmaske. Resolver hat jetzt
+    `cache_only`; `run_region` wendet bei `resolve=False` die gecachten IDs an (kein Netz, Direktlinks bleiben).
+  - **[HIGH] Monitoring-Speisung:** gate-demo/liefern/mengen schrieben keine Metriken → `run_region._record_metrics`
+    (idempotent) speist jetzt den Trichter; osnabrueck nicht mehr leer.
+  - **DEFERRED (dokumentiert, vetobar):** `record_delivery`/`reserve`-Verdrahtung (business-shifting, Demo-vs-Real-
+    Design nötig — Top-Post-Essen-Item: ohne sie sind Dashboard-Exklusivität + Dedupe-Versprechen leer) ·
+    FLUSS T1/T4 erst nach 2. Snapshot (zeitlich) · CSV-Konfidenz-Inline-Disclaimer (durch `konfidenz_gruende` gemildert).
 - `02_Daten/.venv/` — lokales venv (gitignored), **open-mastr 0.17.1** + Deps installiert
   (System-`python3` hat kein pip → via `get-pip.py` gebootstrappt, kein sudo).
 - **Phase 0 ABGESCHLOSSEN (16.06.):** `build-db` echter Lauf ✅ (Export-DB 8,6 GB, Download 1575 s), `inspect` ✅,
@@ -171,7 +184,7 @@ cd 02_Daten
 .venv/bin/python -m pipeline.cli build-db                       # Export laden (~3 GB; läuft auf ZBook)
 .venv/bin/python -m pipeline.cli inspect                        # Schema gegen config.py prüfen
 .venv/bin/python -m pipeline.cli leads --plz 48,59              # Region → klassifizierte Leads (CSV)
-.venv/bin/python -m unittest discover -s pipeline/tests -p "test_*.py"   # volle Suite (183 Tests)
+.venv/bin/python -m unittest discover -s pipeline/tests -p "test_*.py"   # volle Suite (188 Tests)
 .venv/bin/python -m pipeline.cli signals --gebiet muensterland # T2-Signal-Shipper (cohort+qualify+QA → SignalRecord-CSV)
 .venv/bin/python -m pipeline.cli qa list                       # QA-Queue ansehen (approve/reject/approve-abr)
 .venv/bin/python -m pipeline.cli snapshot                      # schlanker Wochen-Snapshot (D2)
