@@ -205,3 +205,14 @@ cd 02_Daten
   QA), T4-Selbstwiderspruch, Zirkel-Import, --out-Kollision, Doppel-T6, Metrik-Doubling. Diff braucht 2. Snapshot.
 - **Auftrag (Gründer 16.06.):** das VOLLE generische System bauen inkl. Dashboard, NICHT regionsfixiert — Gebiete = Config.
 - **Demo-Ziel:** echte Post-EEG-Signal-Liste + Dashboard fürs Berater-Essen ~27.06.
+
+## Wissens-Vault (Obsidian + qmd) — AKTIV
+Ein read-only Obsidian/qmd-Vault spiegelt dieses Repo unter ~/goldentime-vault.
+Repo = Wahrheit, Vault = Lese-/Retrieval-Schicht, lokal-only, kein Egress.
+- Projektwissen nachschlagen (statt Docs blind laden):
+    ~/goldentime-vault/_vault/qmd.sh query "<frage>"
+  (oder MCP-Tool "qmd", wenn der Vault als Projekt geöffnet ist)
+- Aktuell halten nach jedem Push (git pull --ff-only + lokaler Reindex, kein Egress):
+    ~/goldentime-vault/_vault/resync.sh
+  Läuft autonom via PostToolUse-Hook (siehe .claude/settings.json) — manuell nicht nötig.
+- NIE in den Vault schreiben, NIE aus Vault-Änderungen pushen. STATE.md im Repo bleibt Master.
