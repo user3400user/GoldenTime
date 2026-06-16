@@ -95,7 +95,7 @@ aus dem Quellcode vermuteten deutschen XSD-Namen waren over-thought — `inspect
 - `02_Daten/pipeline/` — **PULL steht** (Export-Adapter + ABR-Speicher-Anywhere + Normalisierung + CLI).
   **Neu (Session 1):** `signal/` (K5 SignalRecord + from_lead, Konfidenz=Pflicht) · `control/` (D3 config_store
   + D1/D5/D6 `pipeline_state.db`, WAL) · `config_store.json` (versioniert). **36 Tests grün** (stdlib).
-  **Gebaut + integriert + ZWEIT-REVIEW-gehärtet, 177 Tests grün:** register(D4) · snapshot+diff(K2) ·
+  **Gebaut + integriert + ZWEIT-REVIEW-gehärtet, 183 Tests grün:** register(D4) · snapshot+diff(K2) ·
   triggers cohort/diff_based(K3) · qualify+QA(K4/D5) · ledger(K6) · enrich(K7) + evidenz-resolver ·
   dashboard(K8) · deliver(TEIL 5). CLI: `signals`/`qa`/`snapshot`/`diff`/`ledger`/`dashboard`/`liefern`/
   `mengen`/`evidenz-check`/**`weekly`**/**`gate-demo`**. Eigene `pipeline/README.md`.
@@ -126,6 +126,28 @@ aus dem Quellcode vermuteten deutschen XSD-Namen waren over-thought — `inspect
   `re:strom\b` (Energie), Holding/Beteiligung/Vermietung/Invest (Immobilien §2.6). (c) **Diff-Peak-RAM gesenkt:**
   `snapshot/diff._load` lädt kompakte Tupel (nur 6 Diff-Felder) statt dict-je-Zeile → ~12 GB → ~4 GB RSS,
   Semantik durch Snapshot-Diff-Test gelockt. (d) geplant-Bucket-Daten-Limit dokumentiert (0,65 % Lokation, s. o.).
+- **Autonomer R0–R3-Loop (16.06., Multi-Agent + Direkt-Fixes, 183 Tests grün):** Adversariale Ganz-System-
+  Review (Workflow, 6 Dimensionen × Skeptiker-Verify) → bestätigte Funde direkt behoben:
+  - **DEMO-KRITISCH:** `qa list` baute den Evidenz-Link aus der SEE-Nummer (`IndexOeffentlich/SEE…` = HTTP 400) —
+    genau der Pfad, den der Gründer beim QA-Durchlauf abläuft. Jetzt über Resolver-Cache (Direktlink) bzw.
+    Such-Link (HTTP 200); Online-Auflösung opt-in `--online` (Default instant, R1-Review-Befund).
+  - **Ehrlichkeit Liefer-Mail:** Konfidenz nicht mehr nackt ('0.9' → '0.9 (grob, nicht kalibriert)' + Fuss-
+    Disclaimer + Konfidenz-Basis je Lead); Evidenz-Satz konditional (Direktlink-Anteil vs Such-Link).
+  - **Ehrlichkeit Mengen-Report:** Σ-Betriebe DISTINCT über Gebiete (vorher Doppelzählung, real 423 ABR in
+    48/59 ∩ 49); `rejected`-Spalte + Reconciliation (lieferbar+pend+namenlos+rejected+geplant=roh).
+  - **Resolver-Härtung:** `_cache_get/_cache_put` in try/except (DB-locked/voll bricht den Lauf nicht mehr ab,
+    Docstring-Vertrag); Höflichkeits-Pause 0,15 s nur bei echtem Netz-Call.
+  - **Rechtsform-Join [BUSINESS-SHIFTING, vetobar, Commit 3ec1db3]:** `market_actors.Rechtsform` (Katalog,
+    empirisch verifiziert) wird gejoint und flaggt e.V./gGmbH/eG/Stiftung→VEREIN, KöR/AöR/Eigenbetrieb→
+    OEFFENTLICH, AG/SE→KETTE — fängt caritative/Vereins-Träger, deren Form NUR im Rechtsform-Feld steht, nicht
+    im Namen ('Seniorenhilfe St. Franziskus GmbH'=gGmbH, 'INI'=e.V.). + Namens-Heuristik seniorenhilfe/
+    seniorenzentrum/altenheim/`re:\bhospital\b`. **Mengen-Impact Münsterland: lieferbar 43→41, QA-pending
+    66→68** (die 2 sind die o.g. gGmbH+e.V. → gehören in QA, nicht Auto-Lieferung). Flag, nie Streichung.
+  - **Demo-Artefakt R2 neu erzeugt + verifiziert:** `gate-demo muensterland,osnabrueck` → 141 Evidenz-
+    Direktlinks, **0 tote SEE-Links**, Mengen-Report reconciliert, Liefer-Mails mit Disclaimer.
+  - **PARKED (Dashboard-Politur, analysiert, ready):** Monitoring als Gebiet×Trigger-Matrix, Trichter-Ausbeute %,
+    Frische/letzte_erfassung, `effective_trigger` je Gebiet sichtbar, `latest_by_dimension` verdrahten,
+    Liefer-Protokoll-Ansicht (delivery-Tabelle; Schreiber `record_delivery` wird vom CLI-Pfad NIE aufgerufen → leer).
 - `02_Daten/.venv/` — lokales venv (gitignored), **open-mastr 0.17.1** + Deps installiert
   (System-`python3` hat kein pip → via `get-pip.py` gebootstrappt, kein sudo).
 - **Phase 0 ABGESCHLOSSEN (16.06.):** `build-db` echter Lauf ✅ (Export-DB 8,6 GB, Download 1575 s), `inspect` ✅,
@@ -149,7 +171,7 @@ cd 02_Daten
 .venv/bin/python -m pipeline.cli build-db                       # Export laden (~3 GB; läuft auf ZBook)
 .venv/bin/python -m pipeline.cli inspect                        # Schema gegen config.py prüfen
 .venv/bin/python -m pipeline.cli leads --plz 48,59              # Region → klassifizierte Leads (CSV)
-.venv/bin/python -m unittest discover -s pipeline/tests -p "test_*.py"   # volle Suite (177 Tests)
+.venv/bin/python -m unittest discover -s pipeline/tests -p "test_*.py"   # volle Suite (183 Tests)
 .venv/bin/python -m pipeline.cli signals --gebiet muensterland # T2-Signal-Shipper (cohort+qualify+QA → SignalRecord-CSV)
 .venv/bin/python -m pipeline.cli qa list                       # QA-Queue ansehen (approve/reject/approve-abr)
 .venv/bin/python -m pipeline.cli snapshot                      # schlanker Wochen-Snapshot (D2)
