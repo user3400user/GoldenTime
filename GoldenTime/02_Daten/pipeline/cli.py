@@ -248,17 +248,36 @@ def cmd_diff(args: argparse.Namespace) -> int:
         return 1
     prev, curr = paar
     store = cs.load()
+    # Region aus dem Gebiet auflösen (Befund 14: Diff filtert nach PLZ, nicht nur Trigger-Schalter).
+    prefixes: tuple[str, ...] = ()
+    if args.gebiet:
+        g = store.gebiet(args.gebiet)
+        if not g:
+            raise SystemExit(f"Gebiet '{args.gebiet}' nicht im Config-Store ({config.CONFIG_STORE_PATH}).")
+        prefixes = tuple(g.get("plz_prefixes", ()))
     con = dbmod.connect(args.db) if not args.no_enrich else None
+    qa_con = statemod.connect()
     try:
-        records = list(diff_based.diff_based_signals(prev, curr, store, gebiet_id=args.gebiet or None, con=con))
+        records = list(diff_based.diff_based_signals(
+            prev, curr, store, gebiet_id=args.gebiet or None, plz_prefixes=prefixes, con=con))
+        # Befund 12: Diff-Pfad durch Qualifizierer + QA-Gate (wie cmd_signals), nicht ungefiltert liefern.
+        if con:
+            hierarchy.enrich_and_qualify(records, con)
+            for r in records:
+                qa_gate.apply_qa(r, qa_con)
+        deliver = [r for r in records if r.qa_status in (qa_gate.AUTO_OK, qa_gate.APPROVED) and r.entity]
+        pending = [r for r in records if r.qa_status == qa_gate.PENDING]
+        namenlos = [r for r in records if not r.entity]
     finally:
         if con:
             con.close()
+        qa_con.close()
     print(f"Diff {prev.name} -> {curr.name}: {len(records)} Signale "
-          f"(aktive Trigger: {dict(Counter(r.trigger_typ for r in records))}).")
-    if records:
+          f"(Trigger: {dict(Counter(r.trigger_typ for r in records))}) · {len(deliver)} lieferbar · "
+          f"{len(pending)} QA-pending · {len(namenlos)} namenlos.")
+    if deliver:
         out = Path(args.out) if args.out else Path(f"diff_signals_{dt.date.today().isoformat()}.csv")
-        _write_signals_csv(out, records)
+        _write_signals_csv(out, deliver)
         print(f"  -> {out}")
     return 0
 

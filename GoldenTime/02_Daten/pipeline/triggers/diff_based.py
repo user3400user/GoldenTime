@@ -102,39 +102,38 @@ def _load_snapshot_rows(path: Path | str) -> dict[str, dict]:
 def _enrich_units(
     con: sqlite3.Connection | None, einheiten: set[str]
 ) -> dict[str, dict]:
-    """Lade Region/Name-Felder zu den Treffer-Einheiten aus solar_extended (best effort).
+    """Lade Region/Name-Felder zu den Treffer-Einheiten aus solar_extended UND storage_extended.
 
-    Optional: ohne ``con`` oder bei fehlenden Spalten bleibt das Dict leer — das Signal trägt
-    dann nur die Snapshot-Felder, Region/Name macht der nachgelagerte Qualifizierer. Speicher-
-    Träger (T4) liegen in storage_extended; die Anreicherung zielt auf die Solar-Einheit (T1/T5/
-    T6/PV) — für T4 (storage) liefert solar i. d. R. keinen Treffer, was korrekt ist.
+    Zweit-Review-Fix (Befund 13): T1/T5/T6/PV liegen in solar, **T4 (Speicher) in storage_extended**.
+    Beide Tabellen tragen EinheitMastrNummer als PK + Postleitzahl/Ort/Bundesland — sonst wären die
+    T4-Signale region-blind (plz immer None). Ohne ``con`` oder bei fehlenden Spalten bleibt das Dict
+    leer (das Signal trägt dann nur die Snapshot-Felder).
     """
     if con is None or not einheiten:
         return {}
-    try:
-        solar = dbmod.resolve_table(con, "solar")
-    except LookupError:
-        return {}
-    cols = dbmod.table_columns(con, solar)
-    einheit_real = dbmod.resolve_column(cols, "einheit_nr")
-    if not einheit_real:
-        return {}
-    col_map = dbmod.column_map(cols, *_ENRICH_SELECT)
-    present = {lg: c for lg, c in col_map.items() if c}
-    select_parts = [f'"{einheit_real}" AS einheit_nr'] + [
-        f'"{c}" AS {lg}' for lg, c in present.items()
-    ]
-    # IN-Liste in Blöcken (SQLite-Parameterlimit) — robust auch bei vielen Treffern.
     out: dict[str, dict] = {}
     ids = list(einheiten)
     chunk = 500
-    base = "SELECT " + ", ".join(select_parts) + f' FROM "{solar}" WHERE "{einheit_real}" IN '
-    for i in range(0, len(ids), chunk):
-        teil = ids[i : i + chunk]
-        ph = ", ".join("?" for _ in teil)
-        for row in con.execute(base + f"({ph})", teil):
-            d = dict(row)
-            out[d["einheit_nr"]] = d
+    for traeger in ("solar", "storage"):   # solar+storage decken alle Diff-Träger ab
+        try:
+            table = dbmod.resolve_table(con, traeger)
+        except LookupError:
+            continue
+        cols = dbmod.table_columns(con, table)
+        einheit_real = dbmod.resolve_column(cols, "einheit_nr")
+        if not einheit_real:
+            continue
+        present = {lg: c for lg, c in dbmod.column_map(cols, *_ENRICH_SELECT).items() if c}
+        select_parts = [f'"{einheit_real}" AS einheit_nr'] + [
+            f'"{c}" AS {lg}' for lg, c in present.items()
+        ]
+        base = "SELECT " + ", ".join(select_parts) + f' FROM "{table}" WHERE "{einheit_real}" IN '
+        for i in range(0, len(ids), chunk):
+            teil = ids[i : i + chunk]
+            ph = ", ".join("?" for _ in teil)
+            for row in con.execute(base + f"({ph})", teil):
+                d = dict(row)
+                out.setdefault(d["einheit_nr"], d)   # solar/storage sind disjunkte PKs
     return out
 
 
@@ -225,6 +224,7 @@ def diff_based_signals(
     store,
     *,
     gebiet_id: str | None = None,
+    plz_prefixes: tuple[str, ...] = (),
     con: sqlite3.Connection | None = None,
 ) -> Iterator[SignalRecord]:
     """Erzeuge diff-basierte Kaufsignale zwischen zwei Wochen-Snapshots (prev -> curr).
@@ -262,10 +262,15 @@ def diff_based_signals(
         if schluessel in gesehen:
             continue
         gesehen.add(schluessel)
-        yield _build_record(
+        rec = _build_record(
             ev,
             trigger_key,
             konfidenz_flag,
             curr_rows.get(ev.einheit_nr),
             enrich.get(ev.einheit_nr),
         )
+        # Region-Filter (Befund 14): ein Gebiets-Lauf darf NUR Treffer im PLZ-Cluster emittieren.
+        # Ohne bestätigte PLZ (Anreicherung fehlt) wird bei aktivem Filter konservativ verworfen.
+        if plz_prefixes and not (rec.plz and any(rec.plz.startswith(p) for p in plz_prefixes)):
+            continue
+        yield rec

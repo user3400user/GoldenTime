@@ -123,6 +123,10 @@ def classify_diff(
         if ev.field == "abr":
             # §4-Falle 2: Betreiberwechsel ODER reine Umfirmierung — nicht trennbar
             # -> T5 MIT Konfidenz-Flag (QA/Qualifizierer prüft die Umfirmierung).
+            # ABER (Zweit-Review): NULL/leer -> gesetzt (oder umgekehrt) ist eine verspätete
+            # Erst-Registrierung des Betreibers (gleicher Eigentümer), KEIN Wechsel -> kein T5.
+            if diffmod._norm(ev.old) is None or diffmod._norm(ev.new) is None:
+                return None, False
             return T5, True
         if ev.field in ("datum_stilllegung_endg", "datum_stilllegung_vorueb"):
             # §4-Falle 4: nur leer -> gesetzt ist das Repowering-Signal (T6).

@@ -117,7 +117,7 @@ class SignalRecord:
 
     # CSV-Spaltenreihenfolge der Lieferung (frischeste/heißeste oben sortiert der Aufrufer).
     CSV_FIELDS = (
-        "trigger_typ", "dv_flag", "entity", "kwp", "plz", "ort", "bundesland",
+        "trigger_typ", "dv_flag", "entity", "kwp", "einspeisung", "plz", "ort", "bundesland",
         "datum", "speicher_label", "konfidenz", "buy_relevanz", "qa_status",
         "einheit_mastr_nr", "betreiber_mastr_nr", "evidenz_url",
         "konfidenz_gruende", "flags", "geprueft_am", "provenance",
@@ -130,6 +130,7 @@ class SignalRecord:
             "dv_flag": "ja" if self.dv_flag else "",
             "entity": self.entity or "",
             "kwp": "" if self.kwp is None else round(self.kwp, 1),
+            "einspeisung": self.einspeisung or "",
             "plz": self.plz or "",
             "ort": self.ort or "",
             "bundesland": self.bundesland or "",
