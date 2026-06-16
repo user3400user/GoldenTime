@@ -38,6 +38,21 @@ class TestLieferMail(unittest.TestCase):
                       "IndexOeffentlich/2618388", "SEE1", "BESTAND", "DV-pflichtig"]:
             self.assertIn(token, m, token)
 
+    def test_mail_konfidenz_disclaimer_honest(self):
+        # R0-Fix (Konfidenz-Ehrlichkeit): die Zahl darf nicht nackt als '90%' lesbar sein.
+        b = Buckets("Münsterland", lieferbar=[_r("SEE1", "ABR1", "A GmbH", detail_id=2618388)])
+        m = liefer_mail(b)
+        self.assertIn("nicht kalibriert", m)        # Inline-Label an der Konfidenz-Zahl
+        self.assertIn("KEINE kalibrierte", m)        # Fuss-Disclaimer
+
+    def test_mail_evidenz_satz_konditional(self):
+        # R0-Fix: '1 Klick' nur wenn ALLE einen Direktlink haben; sonst Such-Link offen ausweisen.
+        voll = Buckets("M", lieferbar=[_r("SEE1", "ABR1", "A GmbH", detail_id=2618388)])
+        self.assertIn("1 Klick", liefer_mail(voll))
+        teil = Buckets("M", lieferbar=[_r("SEE1", "ABR1", "A GmbH", detail_id=2618388),
+                                       _r("SEE2", "ABR2", "B GmbH", detail_id=None)])
+        self.assertIn("Such-Link", liefer_mail(teil))
+
 
 class TestMengenReport(unittest.TestCase):
     def test_report_shows_betriebe_and_einheiten(self):
@@ -52,6 +67,21 @@ class TestMengenReport(unittest.TestCase):
         # 2 Betriebe, 3 Einheiten, 1 QA-pend, 3 colocated-aus, 10 roh in der Zeile
         for n in ("2", "3", "1", "10"):
             self.assertIn(n, zeile)
+
+    def test_sigma_betriebe_distinct_ueber_gebiete(self):
+        # R0-Fix (Doppelzählung): ABR1 in BEIDEN Gebieten -> Σ-Betriebe distinct = 2, nicht 2+1=3.
+        b1 = Buckets("Münsterland", lieferbar=[_r("S1", "ABR1", "A GmbH"), _r("S2", "ABR2", "B GmbH")], roh=2)
+        b2 = Buckets("Osnabrück", lieferbar=[_r("S3", "ABR1", "A GmbH")], roh=1)
+        rep = mengen_report([b1, b2])
+        sigma = next(l for l in rep.splitlines() if l.strip().startswith("Σ"))
+        self.assertRegex(sigma, r"Σ\s+2\s+3")   # distinct Betriebe=2, Einheiten=3 (2+1)
+
+    def test_report_rejected_spalte_und_reconciliation(self):
+        # R0-Fix: 'rejected' als eigene Spalte + Reconciliation-Hinweis (Buckets summieren auf 'roh').
+        b = Buckets("Münsterland", lieferbar=[_r("S1", "ABR1", "A")], rejected=[_r("S2", "ABR2", "B")], roh=2)
+        rep = mengen_report([b])
+        self.assertIn("rejected", rep)
+        self.assertIn("Reconciliation", rep)
 
 
 if __name__ == "__main__":

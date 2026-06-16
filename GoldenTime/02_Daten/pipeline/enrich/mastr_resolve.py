@@ -16,8 +16,13 @@ from __future__ import annotations
 
 import datetime as dt
 import logging
+import time
 
 log = logging.getLogger(__name__)
+
+# Kleine Höflichkeits-Pause nach jedem ECHTEN Netz-Resolve (nicht bei Cache-Treffern) — schont den
+# öffentlichen MaStR-Server (Modul-Designziel). Cache-Läufe bleiben sofort.
+_PAUSE_S = 0.15
 
 _OVERVIEW = "https://www.marktstammdatenregister.de/MaStR/Einheit/Einheiten/OeffentlicheEinheitenuebersicht"
 _JSON = ("https://www.marktstammdatenregister.de/MaStR/Einheit/EinheitJson/"
@@ -57,8 +62,12 @@ class EvidenzResolver:
         if see in self._mem:
             return self._mem[see]
         if self._cache_con is not None:
-            row = self._cache_con.execute(
-                "SELECT detail_id FROM mastr_url_cache WHERE einheit_mastr_nr = ?", (see,)).fetchone()
+            try:
+                row = self._cache_con.execute(
+                    "SELECT detail_id FROM mastr_url_cache WHERE einheit_mastr_nr = ?", (see,)).fetchone()
+            except Exception as e:   # Cache ist Optimierung, nie Abbruchgrund (R0-Härtung)
+                log.debug("Cache-Lesen für %s fehlgeschlagen: %s", see, e)
+                return _MISS
             if row is not None:
                 self._mem[see] = row[0]
                 return row[0]
@@ -67,11 +76,14 @@ class EvidenzResolver:
     def _cache_put(self, see, detail_id):
         self._mem[see] = detail_id
         if self._cache_con is not None and detail_id is not None:   # Misses NICHT persistieren
-            self._cache_con.execute(
-                "INSERT OR REPLACE INTO mastr_url_cache(einheit_mastr_nr, detail_id, resolved_at) "
-                "VALUES(?, ?, ?)",
-                (see, int(detail_id), dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")))
-            self._cache_con.commit()
+            try:
+                self._cache_con.execute(
+                    "INSERT OR REPLACE INTO mastr_url_cache(einheit_mastr_nr, detail_id, resolved_at) "
+                    "VALUES(?, ?, ?)",
+                    (see, int(detail_id), dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")))
+                self._cache_con.commit()
+            except Exception as e:   # DB locked/zu/voll -> Lauf NICHT abbrechen (Docstring-Vertrag, R0-Härtung)
+                log.debug("Cache-Schreiben für %s fehlgeschlagen: %s", see, e)
 
     # --- Auflösung ---
     def resolve_id(self, see: str) -> int | None:
@@ -94,6 +106,7 @@ class EvidenzResolver:
                     detail_id = int(data[0]["Id"])
             except Exception as e:
                 log.debug("Auflösung %s fehlgeschlagen: %s", see, e)
+            time.sleep(_PAUSE_S)   # nur bei echtem Netz-Call (Cache-Treffer kehren oben früher zurück)
         self._cache_put(see, detail_id)
         return detail_id
 

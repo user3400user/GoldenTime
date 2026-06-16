@@ -79,6 +79,17 @@ def liefer_mail(b: Buckets, *, kaeufer: str = "", funktion: str = "Speicher-Inst
     arten = sorted({TRIGGER_ART.get(r.trigger_typ, r.trigger_typ) for r in b.lieferbar}) or ["BESTAND (einmalig)"]
     trigger = ", ".join(sorted({r.trigger_typ for r in b.lieferbar})) or "T2"
     zeilen = b.lieferbar if max_zeilen is None else b.lieferbar[:max_zeilen]
+    # Evidenz-Aussage ehrlich an den realen Auflösungsgrad koppeln (R0): nur wenn ALLE einen
+    # aufgelösten Direktlink haben, ist es '1 Klick'; sonst offen ausweisen (Such-Link-Anteil).
+    n_lief = len(b.lieferbar)
+    direkt = sum(1 for r in b.lieferbar if getattr(r, "detail_id", None))
+    if n_lief and direkt == n_lief:
+        evidenz_satz = "Evidenz (öffentliche MaStR-Detailseite, 1 Klick)."
+    elif direkt:
+        evidenz_satz = (f"Evidenz: {direkt}/{n_lief} direkter MaStR-Detaillink, "
+                        "Rest robuster Such-Link (MaStR-Nr. als Prüfnummer).")
+    else:
+        evidenz_satz = "Evidenz: öffentlicher MaStR-Such-Link (MaStR-Nr. als Prüfnummer)."
     L = [
         f"Betreff: Gewerbespeicher-Leads {b.region} — {len(b.lieferbar)} Signale "
         f"(KW {heute.isocalendar().week}/{heute.year})",
@@ -94,14 +105,17 @@ def liefer_mail(b: Buckets, *, kaeufer: str = "", funktion: str = "Speicher-Inst
         f"{len(b.speicher_geplant)} mit geplantem Speicher (Re-Opportunity, nicht heiß).",
         f"Exklusivität: {funktion} × {b.region} × {trigger} — exklusiv für dich, vertraglich zugesichert.",
         "",
-        "Je Signal: Betrieb · kWp · Ort · Trigger · Konfidenz · Speicher-Status · Evidenz "
-        "(öffentliche MaStR-Detailseite, 1 Klick).",
+        f"Je Signal: Betrieb · kWp · Ort · Trigger · Konfidenz · Speicher-Status · {evidenz_satz}",
         "",
     ]
     for i, r in enumerate(zeilen, 1):
         dv = " [DV-pflichtig ≥100 kWp]" if r.dv_flag else ""
         L.append(f"{i:2d}. {r.entity}  ·  {(r.kwp or 0):.0f} kWp  ·  {r.plz or '?????'} {r.ort or ''}  ·  {r.trigger_typ}{dv}")
-        L.append(f"    Konfidenz {r.konfidenz} · {r.speicher_label} · Inbetriebnahme {r.datum or '—'}")
+        L.append(f"    Konfidenz {r.konfidenz} (grob, nicht kalibriert) · {r.speicher_label} · Inbetriebnahme {r.datum or '—'}")
+        gr = getattr(r, "konfidenz_gruende", None)
+        gr_txt = " · ".join(str(g) for g in gr) if isinstance(gr, (list, tuple)) else str(gr or "")
+        if gr_txt:
+            L.append(f"      Konfidenz-Basis: {gr_txt}")
         L.append(f"    Nachweis: {r.evidenz_url}  (MaStR-Nr. {r.einheit_mastr_nr})")
     if max_zeilen is not None and len(b.lieferbar) > max_zeilen:
         L.append(f"    … und {len(b.lieferbar) - max_zeilen} weitere in der beigefügten CSV.")
@@ -109,6 +123,9 @@ def liefer_mail(b: Buckets, *, kaeufer: str = "", funktion: str = "Speicher-Inst
         "",
         "Hinweis Speicher: „kein Speicher gemeldet\" = im MaStR nicht eingetragen (~9 % sind un-/spät",
         "registriert) — kein 100-%-Beweis, aber belastbares Signal. Frische/Trigger pro Lead transparent.",
+        "Hinweis Konfidenz: grober ordinaler Vertrauens-Indikator (0–1), KEINE kalibrierte",
+        "Wahrscheinlichkeit — empirisch verankert ist nur der ~9-%-Abschlag für nicht gemeldete Speicher;",
+        "übrige Abschläge sind benannte Heuristik (Konfidenz-Basis je Lead oben).",
         "",
         DL_DE,
         f"— {absender}",
@@ -123,18 +140,20 @@ def mengen_report(buckets: list) -> str:
         f"Stand {dt.date.today().isoformat()} · Zählung: Betriebe (distinct ABR) UND Einheiten · Trigger T2",
         "",
         f"{'Gebiet':16s} {'Art':9s} {'Betriebe':>9s} {'Einheit.':>9s} {'QA-pend':>8s} "
-        f"{'namenlos':>9s} {'geplant':>8s} {'coloc-aus':>10s} {'roh':>6s}",
-        "-" * 95,
+        f"{'namenlos':>9s} {'rejected':>9s} {'geplant':>8s} {'coloc-aus':>10s} {'roh':>6s}",
+        "-" * 104,
     ]
-    s_betr = s_einh = 0
+    s_einh = 0
     for b in buckets:
         L.append(f"{b.region[:16]:16s} {'BESTAND':9s} {b.betriebe():>9d} {len(b.lieferbar):>9d} "
-                 f"{len(b.pending):>8d} {len(b.namenlos):>9d} {len(b.speicher_geplant):>8d} "
+                 f"{len(b.pending):>8d} {len(b.namenlos):>9d} {len(b.rejected):>9d} {len(b.speicher_geplant):>8d} "
                  f"{b.colocated_ausgeschlossen:>10d} {b.roh:>6d}")
-        s_betr += b.betriebe()
         s_einh += len(b.lieferbar)
+    # Σ-Betriebe DISTINCT über alle Gebiete (R0): ein ABR mit Anlagen in mehreren Gebieten zählt 1×,
+    # nicht je Gebiet — sonst Doppelzählung (real: 423 ABR betreiben in PLZ 48/59 UND 49).
+    s_betr = len({r.betreiber_mastr_nr for b in buckets for r in b.lieferbar if r.betreiber_mastr_nr})
     L += [
-        "-" * 95,
+        "-" * 104,
         f"{'Σ':16s} {'':9s} {s_betr:>9d} {s_einh:>9d}",
         "",
         "Lesart (Pricing-relevant, NICHT geschönt):",
@@ -142,5 +161,9 @@ def mengen_report(buckets: list) -> str:
         "· Wiederkehrender FLUSS (Retainer-Basis) kommt aus T1/T4 (Wochen-Diff), sobald ein 2. Snapshot",
         "  vorliegt — diese Zahlen stehen erst nach dem ersten echten Wochen-Diff.",
         "· 'Betriebe' < 'Einheiten': ein Betrieb mit mehreren Anlagen = EIN Lead (ein Anruf, ein Entscheider).",
+        "· Σ 'Betriebe' = DISTINCT über alle Gebiete — ein ABR in mehreren Gebieten zählt 1×, daher kann",
+        "  die Σ-Zeile kleiner sein als die Summe der Gebiets-Zeilen (keine Doppelzählung über Gebiete).",
+        "· Reconciliation je Gebiet: lieferbar + QA-pend + namenlos + rejected + geplant = roh",
+        "  (coloc-aus liegt ausserhalb 'roh' — bereits vor der Qualifizierung verworfen).",
     ]
     return "\n".join(L)

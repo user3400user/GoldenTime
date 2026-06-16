@@ -24,7 +24,7 @@ from . import db as dbmod
 from . import export_adapter
 from .normalize import iter_leads
 from .speicher_check import GEPLANT, build_storage_index
-from .signal import SignalRecord
+from .signal import SignalRecord, mastr_detail_url, mastr_suchlink
 from .triggers import cohort, diff_based
 from .qualify import hierarchy, qa_gate
 from .snapshot import store as snapstore
@@ -223,9 +223,15 @@ def cmd_qa(args: argparse.Namespace) -> int:
         rows = qa_gate.list_queue(con, status=(None if args.status == "alle" else args.status),
                                   limit=args.limit)
         print(f"QA-Queue ({args.status}): {len(rows)} Einträge")
+        # Evidenz-Links klickbar machen (R0, demo-kritisch): der Gründer läuft GENAU diesen Pfad vor
+        # dem Essen ab. SEE -> interne MaStR-ID via Resolver (gecacht); bei Offline/Miss robuster
+        # Such-Link statt totem SEE-Direktlink ('IndexOeffentlich/SEE…' liefert HTTP 400).
+        resolver = mastr_resolve.EvidenzResolver(cache_con=con)
         for r in rows:
-            url = f"https://www.marktstammdatenregister.de/MaStR/Einheit/Detail/IndexOeffentlich/{r['einheit_mastr_nr']}"
-            print(f"  {r['einheit_mastr_nr']:16s} {r['status']:9s} ABR={r['betreiber_mastr_nr'] or '—':16s} "
+            see = r["einheit_mastr_nr"]
+            detail_id = resolver.resolve_id(see)
+            url = mastr_detail_url(detail_id) if detail_id else mastr_suchlink(see)
+            print(f"  {see:16s} {r['status']:9s} ABR={r['betreiber_mastr_nr'] or '—':16s} "
                   f"flags={r['flags_at_review'] or ''}  {url}")
     elif args.action == "approve":
         n = qa_gate.approve(con, args.einheit, grund=args.grund, notiz=args.notiz)
