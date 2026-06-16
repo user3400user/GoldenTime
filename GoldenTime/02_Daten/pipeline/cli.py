@@ -224,12 +224,18 @@ def cmd_qa(args: argparse.Namespace) -> int:
                                   limit=args.limit)
         print(f"QA-Queue ({args.status}): {len(rows)} Einträge")
         # Evidenz-Links klickbar machen (R0, demo-kritisch): der Gründer läuft GENAU diesen Pfad vor
-        # dem Essen ab. SEE -> interne MaStR-ID via Resolver (gecacht); bei Offline/Miss robuster
-        # Such-Link statt totem SEE-Direktlink ('IndexOeffentlich/SEE…' liefert HTTP 400).
-        resolver = mastr_resolve.EvidenzResolver(cache_con=con)
+        # dem Essen ab. Default = nur Cache (instant); --online löst fehlende SEE -> interne MaStR-ID
+        # live auf (langsamer bei kaltem Cache, daher opt-in). Cache-Miss -> robuster Such-Link
+        # (HTTP 200) statt totem SEE-Direktlink ('IndexOeffentlich/SEE…' liefert HTTP 400).
+        resolver = mastr_resolve.EvidenzResolver(cache_con=con) if args.online else None
         for r in rows:
             see = r["einheit_mastr_nr"]
-            detail_id = resolver.resolve_id(see)
+            if resolver is not None:
+                detail_id = resolver.resolve_id(see)            # online auflösen (+ cachen)
+            else:
+                hit = con.execute("SELECT detail_id FROM mastr_url_cache WHERE einheit_mastr_nr = ?",
+                                  (see,)).fetchone()
+                detail_id = hit[0] if hit else None             # nur Cache; Miss -> Such-Link
             url = mastr_detail_url(detail_id) if detail_id else mastr_suchlink(see)
             print(f"  {see:16s} {r['status']:9s} ABR={r['betreiber_mastr_nr'] or '—':16s} "
                   f"flags={r['flags_at_review'] or ''}  {url}")
@@ -557,6 +563,8 @@ def main(argv: list[str] | None = None) -> int:
     sq.add_argument("--notiz", default="")
     sq.add_argument("--status", default="pending", help="list-Filter: pending|approved|rejected|alle")
     sq.add_argument("--limit", type=int, default=None)
+    sq.add_argument("--online", action="store_true",
+                    help="list: fehlende Evidenz-IDs live auflösen (langsamer, füllt Cache) statt nur Cache")
     sq.set_defaults(func=cmd_qa)
 
     sn = sub.add_parser("snapshot", help="schlanken, dated Wochen-Snapshot schreiben (D2)")
