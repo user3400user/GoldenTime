@@ -34,6 +34,7 @@ QA_FLAGS = frozenset({
     "ENERGIE_FIRMA_PRUEFEN",
     "KETTE_PRUEFEN",
     "VEREIN_PRUEFEN",
+    "IMMOBILIEN_PRUEFEN",
 })
 
 # QA-Status-Werte (Spiegel von SignalRecord.qa_status).

@@ -26,6 +26,7 @@ import logging
 import sqlite3
 from dataclasses import dataclass
 
+from . import config
 from . import db as dbmod
 
 log = logging.getLogger(__name__)
@@ -84,17 +85,31 @@ def build_storage_index(
     cols = dbmod.table_columns(con, table)
     abr_col = dbmod.resolve_column(cols, "abr")
     sel_col = dbmod.resolve_column(cols, "lokation_nr")
+    status_col = dbmod.resolve_column(cols, "betriebsstatus")
     if not abr_col:
         raise LookupError(
             f"Speicher-Tabelle '{table}' ohne AnlagenbetreiberMastrNummer-Spalte. "
             f"Vorhandene Spalten: {cols}"
         )
 
+    # Zweit-Review-Fix (16.06., D-Entscheid): NUR 'In Betrieb'-Speicher zählen für den
+    # colocated/Anywhere-Ausschluss. Ein STILLGELEGTER/geplanter Speicher schloss sonst valide
+    # PV-Leads fälschlich aus — toter Speicher = bester Nachrüst-Lead, kein Ausschluss-Grund.
+    # (Belegt: SEE955882610581 wurde wegen einer 2023 endgültig stillgelegten Batterie verworfen.)
+    status_where, status_params = "", []
+    if status_col:
+        status_where = f' AND "{status_col}" = ?'
+        status_params = [config.BETRIEBSSTATUS_IN_BETRIEB]
+    else:
+        log.warning("Speicher-Tabelle '%s' ohne Betriebsstatus-Spalte — "
+                    "stillgelegte Speicher können nicht ausgefiltert werden.", table)
+
     operators = {
         r[0]
         for r in con.execute(
             f'SELECT DISTINCT "{abr_col}" FROM "{table}" '
-            f'WHERE "{abr_col}" IS NOT NULL AND "{abr_col}" <> \'\''
+            f'WHERE "{abr_col}" IS NOT NULL AND "{abr_col}" <> \'\'' + status_where,
+            status_params,
         )
     }
     locations: set[str] = set()
@@ -103,13 +118,14 @@ def build_storage_index(
             r[0]
             for r in con.execute(
                 f'SELECT DISTINCT "{sel_col}" FROM "{table}" '
-                f'WHERE "{sel_col}" IS NOT NULL AND "{sel_col}" <> \'\''
+                f'WHERE "{sel_col}" IS NOT NULL AND "{sel_col}" <> \'\'' + status_where,
+                status_params,
             )
         }
     else:
         log.warning("Speicher-Tabelle '%s' ohne Lokations-Spalte — "
                     "co-lokaler Check nur über SpeicherAmGleichenOrt.", table)
 
-    log.info("Speicher-Index aus '%s': %d Betreiber (ABR) mit Speicher, %d Lokationen.",
-             table, len(operators), len(locations))
+    log.info("Speicher-Index aus '%s' (nur '%s'): %d Betreiber (ABR) mit Speicher, %d Lokationen.",
+             table, config.BETRIEBSSTATUS_IN_BETRIEB, len(operators), len(locations))
     return StorageIndex(frozenset(operators), frozenset(locations))

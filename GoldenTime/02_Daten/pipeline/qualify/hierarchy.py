@@ -20,6 +20,7 @@ der QA-Fingerprint (qa_gate) einen PersonenArt-Proxy hat, ohne ein neues Record-
 from __future__ import annotations
 
 import logging
+import re
 import sqlite3
 from pathlib import Path
 
@@ -45,6 +46,7 @@ LISTE_FLAGS: dict[str, str] = {
     "energie_pv_firmen.txt": "ENERGIE_FIRMA_PRUEFEN",
     "ketten_filialisten.txt": "KETTE_PRUEFEN",
     "vereine_stiftungen.txt": "VEREIN_PRUEFEN",
+    "immobilien.txt": "IMMOBILIEN_PRUEFEN",
 }
 
 # Flag für natürliche Personen MIT ausgewiesenem Namen (e.K.-Caveat): flaggen, NICHT hart ausschließen.
@@ -58,27 +60,74 @@ FLAG_NATUERLICHE_PERSON = "NATUERLICHE_PERSON_PRUEFEN"
 # (nicht reviewbar ohne Namen), separater 'namenlos'-Bucket, via Anreicherung (K7) später erreichbar.
 FLAG_PRIVAT_REDACTED = "PRIVATPERSON_REDACTED"
 
+# §2.4: Rechtsform SE/AG als Konzern-Warnsignal -> KETTE_PRUEFEN (manuell bestätigen).
+_RECHTSFORM_SE_AG = re.compile(r"\b(se|ag)\b", re.IGNORECASE)
 
-def _load_patterns(dateiname: str) -> tuple[str, ...]:
-    """Lese eine Heuristik-Liste: eine Zeile = ein Substring-Muster (klein, getrimmt).
+# §2.1: Firmen-/Rechtsform-/Branchen-Tokens, deren Vorkommen einen Namen als FIRMA (nicht
+# bloße Person) ausweist — Gegenprobe zum Personennamen-Muster.
+_FIRMA_TOKEN = re.compile(
+    r"\b(gmbh|mbh|ohg|kg|gbr|ug|ag|se|e\.?\s?k|e\.?\s?v|e\.?\s?g|eg|inh|co|"
+    r"gesellschaft|verwaltung|firma|stiftung|verein|hof|bau|technik|service|"
+    r"handel|logistik|transport|energie|solar|immobil|agrar|metall|stahl|holz|"
+    r"dach|garten|elektro|kraft|werk|gut|mühle)\b",
+    re.IGNORECASE,
+)
+# Ein einzelnes Namens-Token: Großbuchstabe + Kleinbuchstaben (mit optionalem Bindestrich-Teil).
+_NAME_TOKEN = re.compile(r"^[A-ZÄÖÜ][a-zäöüß]+(?:-[A-ZÄÖÜ][a-zäöüß]+)?$")
 
-    Kommentar-Zeilen ('#') und Leerzeilen werden übersprungen. Fehlt die Datei, wird
-    leer zurückgegeben (Pipeline crasht nicht, nur dieser Filter greift nicht).
+
+def _looks_like_person(firmenname: str | None) -> bool:
+    """§2.1: sieht der Name wie ein bloßer Personenname aus ('Vorname Nachname', evtl. mehrere
+    Personen via '/', 'und', '&') OHNE Rechtsform/Firmen-/Branchen-Token und ohne Ziffer?
+
+    Konservativ + auf Flag-zu-QA ausgelegt (e.K.-Caveat): lieber einen Grenzfall flaggen als
+    durchrutschen lassen. Belege der Zweit-Review: 'Oliver Topmöller', 'Jan Ritschny',
+    'Christina Rahmann/Astrid Schröter', 'Hildegard Schulze-Icking und Gerd …'.
+    """
+    if not firmenname:
+        return False
+    n = firmenname.strip()
+    if any(c.isdigit() for c in n) or _FIRMA_TOKEN.search(n):
+        return False
+    teile = [t for t in re.split(r"\s*(?:/|&|,|\bund\b|\bu\.\b)\s*", n) if t.strip()]
+    if not (1 <= len(teile) <= 3):
+        return False
+    for teil in teile:
+        woerter = teil.split()
+        if not (1 <= len(woerter) <= 3) or not all(_NAME_TOKEN.match(w) for w in woerter):
+            return False
+    # mind. eine 'Vorname Nachname'-Struktur (>=2 Wörter) ODER mehrere Personen-Teile.
+    return len(teile) > 1 or any(len(t.split()) >= 2 for t in teile)
+
+
+def _load_patterns(dateiname: str) -> tuple:
+    """Lese eine Heuristik-Liste: eine Zeile = ein Muster, getrimmt. Präfix 're:' = Regex
+    (Wortgrenze für kurze/kollisionsanfällige Tokens), sonst Substring (klein).
+
+    Kommentar-Zeilen ('#') und Leerzeilen werden übersprungen. Fehlt die Datei, wird leer
+    zurückgegeben (Pipeline crasht nicht, nur dieser Filter greift nicht). Rückgabe: Tupel von
+    ``("sub", lower-str)`` bzw. ``("re", compiled)``.
     """
     pfad = HEURISTICS_DIR / dateiname
     if not pfad.exists():
         log.warning("Heuristik-Liste %s fehlt — Filter '%s' inaktiv.", pfad, dateiname)
         return ()
-    muster: list[str] = []
+    muster: list[tuple] = []
     for zeile in pfad.read_text(encoding="utf-8").splitlines():
         s = zeile.strip()
         if not s or s.startswith("#"):
             continue
-        muster.append(s.lower())
+        if s.startswith("re:"):
+            try:
+                muster.append(("re", re.compile(s[3:].strip(), re.IGNORECASE)))
+            except re.error as e:
+                log.warning("Ungültiges Regex in %s: %r (%s)", dateiname, s, e)
+        else:
+            muster.append(("sub", s.lower()))
     return tuple(muster)
 
 
-def _load_alle_listen() -> dict[str, tuple[str, ...]]:
+def _load_alle_listen() -> dict[str, tuple]:
     """Alle Heuristik-Listen einmal laden (Datei-Muster je Kategorie)."""
     return {datei: _load_patterns(datei) for datei in LISTE_FLAGS}
 
@@ -89,12 +138,18 @@ def _is_natuerliche_person(personenart: object) -> bool:
     return "natür" in s or "natuer" in s
 
 
-def _matcht(firmenname: str | None, muster: tuple[str, ...]) -> bool:
-    """True, wenn irgendein Substring-Muster (klein) im Firmennamen (klein) vorkommt."""
+def _matcht(firmenname: str | None, muster: tuple) -> bool:
+    """True, wenn irgendein Muster (Substring oder Regex) auf den Firmennamen passt."""
     if not firmenname:
         return False
     name = firmenname.lower()
-    return any(m in name for m in muster)
+    for kind, pat in muster:
+        if kind == "sub":
+            if pat in name:
+                return True
+        elif pat.search(firmenname):     # Regex trägt IGNORECASE
+            return True
+    return False
 
 
 def _add_flags(record: SignalRecord, *neue: str) -> None:
@@ -200,14 +255,24 @@ def enrich_and_qualify(
 
         _merke_personenart(record, personenart)
 
-        # (2) Hierarchie: natürliche Person. MIT Namen = echter QA-Grenzfall (e.K./benannte GbR);
-        # OHNE Namen (redacted) = Privatperson -> Phase 1 nicht lieferbar, KEIN QA (s. FLAG_PRIVAT_REDACTED).
-        if personenart is not None and _is_natuerliche_person(personenart):
-            _add_flags(record, FLAG_NATUERLICHE_PERSON if record.entity else FLAG_PRIVAT_REDACTED)
-
-        # Listen-Treffer gegen den (angereicherten) Firmennamen.
+        # (2a) Spezifische Listen-Hierarchie (öffentl. Hand / Energie-PV / Kette-Konzern / Verein /
+        # Immobilien) + §2.4 SE/AG-Konzern-Warnung. Diese präzisen Regeln haben VORRANG vor dem
+        # groben Namensmuster (sonst bekäme 'Klinikum Stuttgart' fälschlich AUCH ein Personen-Flag).
+        liste_griff = False
         for datei, flag in LISTE_FLAGS.items():
             if _matcht(firmenname, listen[datei]):
                 _add_flags(record, flag)
+                liste_griff = True
+        if record.entity and _RECHTSFORM_SE_AG.search(record.entity):
+            _add_flags(record, "KETTE_PRUEFEN")
+            liste_griff = True
+
+        # (2b) §2.1 natürliche Person: PersonenArt-Klasse (immer) ODER bloßer Personenname (auch bei
+        # PersonenArt='Organisation' — Zweit-Review-Befund), Letzteres nur, wenn keine spezifischere
+        # Regel schon griff. MIT Namen -> QA (e.K.-Caveat); OHNE Namen (redacted) -> Privatperson-Bucket.
+        by_pa = personenart is not None and _is_natuerliche_person(personenart)
+        by_name = (not liste_griff) and _looks_like_person(record.entity)
+        if by_pa or by_name:
+            _add_flags(record, FLAG_NATUERLICHE_PERSON if record.entity else FLAG_PRIVAT_REDACTED)
 
     return records

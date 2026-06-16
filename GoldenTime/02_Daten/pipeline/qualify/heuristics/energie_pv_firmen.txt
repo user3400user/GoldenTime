@@ -1,16 +1,31 @@
-# Energie- / PV- / Speicher-Branche — Substring-Muster (case-insensitiv gegen Firmenname).
-# Eine Zeile = ein Muster; '#'-Zeilen und Leerzeilen werden ignoriert.
-# Treffer -> Flag ENERGIE_FIRMA_PRUEFEN: Branchenakteur kennt Speicher selbst (Eigenbedarf
-# oder Wettbewerber) -> i.d.R. kein Lead, aber Mensch-QA entscheidet (z.B. Dachdecker mit
-# 'solar' im Namen ist evtl. doch Endkunde).
+# PV-/Energie-/Projektgesellschaften (Lead-Spec §2.5) — Treffer -> Flag ENERGIE_FIRMA_PRUEFEN.
+# Selbstversorger/Wettbewerber. Substring case-insensitiv; 're:' = Regex (Wortgrenze).
+# Hinweis: Bürger-Solar-GbRs / Dachdecker mit 'solar' im Namen können valide Leads sein
+# -> Flag (Mensch-QA entscheidet), keine harte Streichung.
 energie
-solar
-photovoltaik
-windpark
-windenergie
-energiegenossenschaft
-solarpark
+energy
+energieversorgung
 ökostrom
 green energy
-energieversorgung
+solar
+solarpark
+photovoltaik
+fotovoltaik
+windpark
+windkraft
+windenergie
+energiegenossenschaft
 speicher
+sonne
+sonnen
+sonnenkraft
+erneuerbar
+projektgesellschaft
+bürgersolar
+bürgerenergie
+sunshine
+sunpower
+# kurze/kollisionsanfällige Tokens nur mit Wortgrenze
+re:\bpv\b
+re:\bpva\b
+re:\bpv[- ]?anlage

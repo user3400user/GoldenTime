@@ -1,8 +1,8 @@
-# Ketten / Filialisten — Substring-Muster (case-insensitiv gegen Firmenname).
-# Eine Zeile = ein Muster; '#'-Zeilen und Leerzeilen werden ignoriert.
-# Treffer -> Flag KETTE_PRUEFEN: Filialist mit zentralem Einkauf -> Lead-Wert je Standort
-# fraglich (Entscheidung fällt in der Zentrale). Bewusst KONKRETE Marken statt pauschalem
-# 'gmbh & co. kg' (das trifft zu viele echte Mittelständler). Mensch-QA entscheidet.
+# Ketten/Filialisten + B2B-Konzerne (Lead-Spec §2.4) — Treffer -> Flag KETTE_PRUEFEN.
+# Zentraler Einkauf -> Lead-Wert je Standort fraglich. KONKRETE Marken/Konzerne statt
+# pauschalem 'gmbh & co. kg'. Substring case-insensitiv; 're:' = Regex (Wortgrenze).
+# SE-/AG-Rechtsform-Warnung macht hierarchy.py separat (§2.4 'AG/SE als Warnsignal').
+# Liste wächst pflegbar mit jedem gefundenen Durchrutscher (§7.3).
 lidl
 aldi
 rewe
@@ -17,3 +17,11 @@ burger king
 obi
 bauhaus
 hornbach
+# B2B-Konzerne (Recycling/Entsorgung/Industrie) — durch die Zweit-Review belegt (ALBA)
+alba
+remondis
+veolia
+suez
+prezero
+schwarz
+tönnies

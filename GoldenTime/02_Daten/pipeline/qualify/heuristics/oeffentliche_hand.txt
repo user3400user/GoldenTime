@@ -1,14 +1,37 @@
-# Öffentliche Hand / Kommunalbetriebe — Substring-Muster (case-insensitiv gegen Firmenname).
-# Eine Zeile = ein Muster; '#'-Zeilen und Leerzeilen werden ignoriert.
-# Treffer -> Flag OEFFENTLICH_PRUEFEN (Mensch-QA entscheidet, KEINE harte Streichung —
-# z.B. kommunale Eigenbetriebe können trotzdem Käufer sein).
-stadtverwaltung
+# Öffentliche Hand / Kommunalbetriebe (Lead-Spec §2.2) — Treffer -> Flag OEFFENTLICH_PRUEFEN.
+# Eine Zeile = ein Muster (case-insensitiv, Substring). Zeilen mit Präfix 're:' = Regex
+# (für kurze/kollisionsanfällige Tokens mit Wortgrenze). '#'/Leerzeilen ignoriert.
+# Mensch-QA entscheidet (kommunale Eigenbetriebe können Käufer sein) — keine harte Streichung.
 gemeinde
 landkreis
 kommunal
 stadtwerke
+stadtverwaltung
 zweckverband
 landesbetrieb
 bundesanstalt
 körperschaft
 anstalt des öffentlichen rechts
+# Kliniken / Krankenhäuser (§2.2 nennt 'Klinikum' wörtlich)
+klinik
+klinikum
+krankenhaus
+universitätsklinik
+# kommunale Ver-/Entsorgung + Verkehr (Eigenbetriebe, Abfall, ÖPNV)
+eigenbetrieb
+entsorgung
+abfall
+abfallwirtschaft
+abfallbewirtschaftung
+abwasser
+wasserverband
+verkehrsbetrieb
+verkehrsgesellschaft
+wirtschaftsförder
+# Behörden / Gebietskörperschaften (Wortgrenze, sonst 'Hauptamt'/'Neustadt' false-positive)
+re:\bamt\b
+re:\bstadt\b
+re:\bkreis\b
+re:\bfreistaat\b
+re:\bbundeswehr\b
+re:\bland\s+(baden|bayern|hessen|niedersachsen|nordrhein|sachsen|thüringen)

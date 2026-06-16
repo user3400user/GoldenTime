@@ -1,0 +1,16 @@
+# Reine Immobilien-/Grundbesitz-/Vermögensverwaltungsgesellschaften (Lead-Spec §2.6)
+# -> Flag IMMOBILIEN_PRUEFEN. Betriebsaufspaltung: der Pain-Owner (Stromverbraucher) sitzt
+# woanders -> bei Anreicherung Standort-Firma suchen, NICHT hart streichen. Substring case-insensitiv.
+immobilien
+immobilie
+grundbesitz
+grundstück
+grundstücksgemeinschaft
+grundstücksverwaltung
+grundstücksgesellschaft
+vermögensverwaltung
+besitzgesellschaft
+besitz- und verwaltung
+hausverwaltung
+wohnungsbau
+wohnbau
