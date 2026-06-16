@@ -95,9 +95,18 @@ aus dem Quellcode vermuteten deutschen XSD-Namen waren over-thought — `inspect
 - `02_Daten/pipeline/` — **PULL steht** (Export-Adapter + ABR-Speicher-Anywhere + Normalisierung + CLI).
   **Neu (Session 1):** `signal/` (K5 SignalRecord + from_lead, Konfidenz=Pflicht) · `control/` (D3 config_store
   + D1/D5/D6 `pipeline_state.db`, WAL) · `config_store.json` (versioniert). **36 Tests grün** (stdlib).
-  **Gebaut + integriert (CLI), 151 Tests grün, end-to-end auf Echtdaten validiert:** register(D4) ·
-  snapshot+diff(K2) · triggers cohort/diff_based(K3) · qualify+QA(K4/D5) · ledger(K6) · enrich(K7, aus) ·
-  dashboard(K8)+metrics. CLI: `signals`/`qa`/`snapshot`/`diff`/`ledger`/`dashboard`. Eigene `pipeline/README.md`.
+  **Gebaut + integriert + ZWEIT-REVIEW-gehärtet, 172 Tests grün:** register(D4) · snapshot+diff(K2) ·
+  triggers cohort/diff_based(K3) · qualify+QA(K4/D5) · ledger(K6) · enrich(K7) + evidenz-resolver ·
+  dashboard(K8) · deliver(TEIL 5). CLI: `signals`/`qa`/`snapshot`/`diff`/`ledger`/`dashboard`/`liefern`/
+  `mengen`/`evidenz-check`. Eigene `pipeline/README.md`.
+- **Unabhängige Zweit-Review (16.06.) — Datenpipeline+Diff-Engine+Integrität korrekt; Qualifizierer war
+  unvollständig.** Fixes (4 Blöcke, je Commit auf `vollpaket-phase1`): Qualifizierer §2 vollständig (Namens-
+  muster + erweiterte Heuristik-Listen mit `re:`-Wortgrenzen + Immobilien + SE/AG → QA-Flags; Münsterland
+  72→47 lieferbar = ehrliche Zahl) · Speicher-Index nur 'In Betrieb' (tote Speicher = Lead, nicht Ausschluss) ·
+  Diff-Pfad durch Qualifizierer+QA + PLZ-Region-Filter + T4-Region aus storage_extended · **Evidenz-URL FIX:**
+  SEE→interne-ID via MaStR-API (Filter `MaStR-Nr. der Einheit`), gecacht, Direktlink statt totem SEE-Link
+  (live 200 verifiziert) · GemeinsamRegistrierte-Co-Lokalität · einspeisung in CSV · ehrlicher Mengen-Report
+  (Betriebe+Einheiten, T2=Bestand). Konfidenz = grober ordinaler Indikator, NICHT kalibriert (nur 9%-Abschlag empirisch).
 - `02_Daten/.venv/` — lokales venv (gitignored), **open-mastr 0.17.1** + Deps installiert
   (System-`python3` hat kein pip → via `get-pip.py` gebootstrappt, kein sudo).
 - **Phase 0 ABGESCHLOSSEN (16.06.):** `build-db` echter Lauf ✅ (Export-DB 8,6 GB, Download 1575 s), `inspect` ✅,

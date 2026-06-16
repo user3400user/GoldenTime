@@ -15,7 +15,7 @@ import unittest
 from pipeline.qualify import hierarchy as H
 from pipeline.qualify import qa_gate
 from pipeline.signal import SignalRecord
-from pipeline.speicher_check import NONE_REPORTED, build_storage_index
+from pipeline.speicher_check import COLOCATED, NONE_REPORTED, build_storage_index
 
 
 def _rec(einheit: str, abr: str, entity: str | None = None) -> SignalRecord:
@@ -113,11 +113,14 @@ class TestStorageBetriebsstatus(unittest.TestCase):
         con = sqlite3.connect(":memory:")
         con.row_factory = sqlite3.Row
         con.execute("CREATE TABLE storage_extended (EinheitMastrNummer TEXT, "
-                    "AnlagenbetreiberMastrNummer TEXT, LokationMastrNummer TEXT, EinheitBetriebsstatus TEXT)")
-        con.executemany("INSERT INTO storage_extended VALUES (?,?,?,?)", [
-            ("SSE1", "ABR_LIVE", "SEL_LIVE", "In Betrieb"),
-            ("SSE2", "ABR_DEAD", "SEL_DEAD", "Endgültig stillgelegt"),
-            ("SSE3", "ABR_PLAN", "SEL_PLAN", "In Planung"),
+                    "AnlagenbetreiberMastrNummer TEXT, LokationMastrNummer TEXT, "
+                    "GemeinsamRegistrierteSolareinheitMastrNummer TEXT, EinheitBetriebsstatus TEXT)")
+        con.executemany("INSERT INTO storage_extended VALUES (?,?,?,?,?)", [
+            ("SSE1", "ABR_LIVE", "SEL_LIVE", None, "In Betrieb"),
+            ("SSE2", "ABR_DEAD", "SEL_DEAD", None, "Endgültig stillgelegt"),
+            ("SSE3", "ABR_PLAN", "SEL_PLAN", None, "In Planung"),
+            # In-Betrieb-Speicher zeigt per Back-Link direkt auf eine Solar-Einheit an ANDERER Lokation
+            ("SSE4", "ABR_X", "SEL_STORAGE", "SEE_PV_OTHERLOC", "In Betrieb"),
         ])
         con.commit()
         return con
@@ -130,6 +133,14 @@ class TestStorageBetriebsstatus(unittest.TestCase):
         self.assertNotIn("SEL_DEAD", idx.locations)
         # PV-Betreiber mit nur TOTEM Speicher -> none_reported (lieferbar), NICHT colocated
         self.assertEqual(idx.classify("ABR_DEAD", "SEL_DEAD", None), NONE_REPORTED)
+
+    def test_colocated_via_gemeinsam_backlink(self):
+        idx = build_storage_index(self._db())
+        self.assertIn("SEE_PV_OTHERLOC", idx.colocated_solar)
+        # die PV-Einheit liegt an einer ANDEREN Lokation (SEL_PV != SEL_STORAGE), trotzdem co-lokal
+        self.assertEqual(idx.classify("ABR_PV", "SEL_PV", None, einheit_nr="SEE_PV_OTHERLOC"), COLOCATED)
+        # eine PV ohne Back-Link bleibt none_reported
+        self.assertEqual(idx.classify("ABR_PV", "SEL_PV", None, einheit_nr="SEE_OTHER"), NONE_REPORTED)
 
 
 if __name__ == "__main__":

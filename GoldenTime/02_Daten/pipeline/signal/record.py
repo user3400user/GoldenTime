@@ -29,10 +29,14 @@ MASTR_DETAIL_URL = "https://www.marktstammdatenregister.de/MaStR/Einheit/Detail/
 MASTR_SUCHE_URL = "https://www.marktstammdatenregister.de/MaStR/Einheit/Einheiten/OeffentlicheEinheitenuebersicht"
 
 # --- Konfidenz-Modell: Abschläge zentral, nicht verstreut (Briefing §4 Gotchas) ---
+# EHRLICHKEIT (Zweit-Review): das ist ein GROBER ordinaler Vertrauens-Indikator, KEINE kalibrierte
+# Wahrscheinlichkeit. Empirisch verankert ist nur ABSCHLAG_KEIN_SPEICHER_GEMELDET (~9 % un-/spät
+# gemeldet). FRISCHE/RETROFIT sind plausible, aber nicht kalibrierte Heuristik-Abschläge — die
+# konfidenz_gruende führen den jeweiligen Grund als Klartext mit, damit der Käufer die Basis sieht.
 KONF_BASIS = 1.0
 ABSCHLAG_KEIN_SPEICHER_GEMELDET = 0.10   # "nicht gemeldet" ≠ "existiert nicht" (~9 % unregistriert)
 ABSCHLAG_FRISCHE_WARNUNG = 0.25          # IBN ≪ reg_datum → Nachregistrierungs-Verdacht (R3 §7b)
-ABSCHLAG_RETROFIT_LUECKE = 0.15          # Speicher-Retrofit nur ~40 % fristgerecht gemeldet (T4)
+ABSCHLAG_RETROFIT_LUECKE = 0.15          # T4-Vorbehalt: Retrofit-Meldung lückenhaft (~40 % fristgerecht)
 KONF_MIN = 0.30                          # Untergrenze: ein gemeldeter Datensatz bleibt belastbar
 
 # Warum-jetzt je Trigger (Buy-Relevanz, Briefing §5).

@@ -171,7 +171,8 @@ def cohort_signals(
 
         abr = r.get("abr")
         lokation = r.get("lokation_nr")
-        status = index.classify(abr, lokation, r.get("speicher_gleicher_ort"))
+        status = index.classify(abr, lokation, r.get("speicher_gleicher_ort"),
+                                einheit_nr=r.get("einheit_nr"))
         if status == COLOCATED:
             # Transparenz (Zweit-Review): die stille Ausschluss-Menge zählbar machen, statt nur
             # `continue`. Der Mengen-Report zeigt, wie viele Leads warum verschwinden.

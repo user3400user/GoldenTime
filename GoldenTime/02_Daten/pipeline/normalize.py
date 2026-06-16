@@ -159,7 +159,8 @@ def iter_leads(
 
         abr = r.get("abr")
         lokation = r.get("lokation_nr")
-        status = index.classify(abr, lokation, r.get("speicher_gleicher_ort"))
+        status = index.classify(abr, lokation, r.get("speicher_gleicher_ort"),
+                                einheit_nr=r.get("einheit_nr"))
 
         reg = _parse_date(r.get("reg_datum"))
         ibn = _parse_date(r.get("inbetriebnahme"))

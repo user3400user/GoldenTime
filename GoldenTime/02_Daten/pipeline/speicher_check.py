@@ -48,19 +48,25 @@ LABEL = {
 class StorageIndex:
     """Vorberechnete Speicher-Indizes: einmal bauen, dann O(1) je Lead klassifizieren."""
 
-    operators: frozenset[str]   # ABR mit >=1 gemeldetem Speicher (irgendwo)
+    operators: frozenset[str]   # ABR mit >=1 gemeldetem (In-Betrieb-)Speicher (irgendwo)
     locations: frozenset[str]   # SEL-Lokationen mit >=1 gemeldetem Speicher
+    colocated_solar: frozenset[str] = frozenset()   # Solar-EinheitMastrNr, auf die ein Speicher
+    #   per GemeinsamRegistrierteSolareinheitMastrNummer direkt zeigt (Zweit-Review-Fix)
 
     def classify(self, abr: str | None, lokation: str | None,
-                 speicher_am_gleichen_ort: object = None) -> str:
+                 speicher_am_gleichen_ort: object = None, einheit_nr: str | None = None) -> str:
         """Klassifiziere eine PV-Einheit gegen den Speicher-Index.
 
-        ``speicher_am_gleichen_ort``: das PV-seitige Bool-Feld ``SpeicherAmGleichenOrt``
-        (truthy / 1 / "1" / "true" zählt). Co-lokal = dieses Flag ODER die PV-Lokation
-        führt selbst einen Speicher.
+        Co-lokal (= Speicher am Standort, Bedarf gedeckt -> Ausschluss), wenn EINES gilt:
+        (a) PV-seitiges Flag ``SpeicherAmGleichenOrt`` truthy, (b) die PV-Lokation führt selbst
+        einen Speicher, ODER (c) ein Speicher zeigt per ``GemeinsamRegistrierteSolareinheitMastr-
+        Nummer`` direkt auf DIESE PV-Einheit (``einheit_nr``) — der direkte Back-Link fängt die
+        ~15.492 co-registrierten Paare mit ABWEICHENDER Lokation, die (b) verfehlt.
         """
-        colocated = _truthy(speicher_am_gleichen_ort) or (
-            bool(lokation) and lokation in self.locations
+        colocated = (
+            _truthy(speicher_am_gleichen_ort)
+            or (bool(lokation) and lokation in self.locations)
+            or (bool(einheit_nr) and einheit_nr in self.colocated_solar)
         )
         if colocated:
             return COLOCATED
@@ -126,6 +132,20 @@ def build_storage_index(
         log.warning("Speicher-Tabelle '%s' ohne Lokations-Spalte — "
                     "co-lokaler Check nur über SpeicherAmGleichenOrt.", table)
 
-    log.info("Speicher-Index aus '%s' (nur '%s'): %d Betreiber (ABR) mit Speicher, %d Lokationen.",
-             table, config.BETRIEBSSTATUS_IN_BETRIEB, len(operators), len(locations))
-    return StorageIndex(frozenset(operators), frozenset(locations))
+    # Direkter Back-Link Speicher -> co-registrierte Solar-Einheit (GemeinsamRegistrierteSolar-
+    # einheitMastrNummer). Fängt co-lokale Paare mit abweichender Lokation (Zweit-Review-Fix).
+    gem_col = dbmod.resolve_column(cols, "gem_solar_nr")
+    colocated_solar: set[str] = set()
+    if gem_col:
+        colocated_solar = {
+            r[0]
+            for r in con.execute(
+                f'SELECT DISTINCT "{gem_col}" FROM "{table}" '
+                f'WHERE "{gem_col}" IS NOT NULL AND "{gem_col}" <> \'\'' + status_where,
+                status_params,
+            )
+        }
+
+    log.info("Speicher-Index aus '%s' (nur '%s'): %d Betreiber, %d Lokationen, %d co-reg. Solar-Einheiten.",
+             table, config.BETRIEBSSTATUS_IN_BETRIEB, len(operators), len(locations), len(colocated_solar))
+    return StorageIndex(frozenset(operators), frozenset(locations), frozenset(colocated_solar))
