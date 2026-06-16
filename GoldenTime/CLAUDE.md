@@ -95,7 +95,7 @@ aus dem Quellcode vermuteten deutschen XSD-Namen waren over-thought — `inspect
 - `02_Daten/pipeline/` — **PULL steht** (Export-Adapter + ABR-Speicher-Anywhere + Normalisierung + CLI).
   **Neu (Session 1):** `signal/` (K5 SignalRecord + from_lead, Konfidenz=Pflicht) · `control/` (D3 config_store
   + D1/D5/D6 `pipeline_state.db`, WAL) · `config_store.json` (versioniert). **36 Tests grün** (stdlib).
-  **Gebaut + integriert + ZWEIT-REVIEW-gehärtet, 172 Tests grün:** register(D4) · snapshot+diff(K2) ·
+  **Gebaut + integriert + ZWEIT-REVIEW-gehärtet, 177 Tests grün:** register(D4) · snapshot+diff(K2) ·
   triggers cohort/diff_based(K3) · qualify+QA(K4/D5) · ledger(K6) · enrich(K7) + evidenz-resolver ·
   dashboard(K8) · deliver(TEIL 5). CLI: `signals`/`qa`/`snapshot`/`diff`/`ledger`/`dashboard`/`liefern`/
   `mengen`/`evidenz-check`/**`weekly`**/**`gate-demo`**. Eigene `pipeline/README.md`.
@@ -106,6 +106,11 @@ aus dem Quellcode vermuteten deutschen XSD-Namen waren over-thought — `inspect
 - **Speicher-Klassifikation jetzt 4-Wege** (Gründer-Entscheid): none_reported / operator_elsewhere(Premium) /
   colocated(Ausschluss, nur In-Betrieb-Speicher) / **geplant** ('In Planung'-Speicher am Standort → eigener
   Bucket, NICHT heiß, für Re-Opportunity mitgeführt). `config.STORAGE_GEPLANT_STATUS`.
+  ⚠ **Daten-Limit (ehrlich, Zweit-Review-3, real geprüft):** 'In Planung'-Speicher (22.870 bundesweit) tragen
+  **nur zu 0,65 % eine `LokationMastrNummer`** (148 Stück) — vor Inbetriebnahme ist die Lokations-/Co-Reg-
+  Verknüpfung im MaStR meist leer. Der geplant-Bucket ist also **strukturell dünn**: Co-Lokalität via Lokations-
+  Set greift fast nie, der OPERATOR_ELSEWHERE-Zweig (Betreiber-MaStR-Nr.) trägt ihn. Nicht als „vollständige
+  Pipeline geplanter Speicher" verkaufen — er ist ein Beifang, kein verlässlicher Re-Opportunity-Index.
 - **Unabhängige Zweit-Review (16.06.) — Datenpipeline+Diff-Engine+Integrität korrekt; Qualifizierer war
   unvollständig.** Fixes (4 Blöcke, je Commit auf `vollpaket-phase1`): Qualifizierer §2 vollständig (Namens-
   muster + erweiterte Heuristik-Listen mit `re:`-Wortgrenzen + Immobilien + SE/AG → QA-Flags; Münsterland
@@ -114,6 +119,13 @@ aus dem Quellcode vermuteten deutschen XSD-Namen waren over-thought — `inspect
   SEE→interne-ID via MaStR-API (Filter `MaStR-Nr. der Einheit`), gecacht, Direktlink statt totem SEE-Link
   (live 200 verifiziert) · GemeinsamRegistrierte-Co-Lokalität · einspeisung in CSV · ehrlicher Mengen-Report
   (Betriebe+Einheiten, T2=Bestand). Konfidenz = grober ordinaler Indikator, NICHT kalibriert (nur 9%-Abschlag empirisch).
+- **Zweit-Review Runde 3 (16.06., 177 Tests grün):** (a) `_looks_like_person` normalisiert Voll-Breiten-`＆`
+  (U+FF06, im Export 22× häufiger als ASCII) und erkennt `u.`-Trenner korrekt (`\bu\.\b` matchte nie) →
+  'Krühler ＆ Sander' / 'Linus u. Astrid Olbrich' rutschen nicht mehr ungeflaggt durch. (b) Heuristik-Listen
+  erweitert: KöR/k.ö.r. (öffentl.), VR-/Kreissparkasse + religiöse Orden (Verein), Biogas/Biomasse +
+  `re:strom\b` (Energie), Holding/Beteiligung/Vermietung/Invest (Immobilien §2.6). (c) **Diff-Peak-RAM gesenkt:**
+  `snapshot/diff._load` lädt kompakte Tupel (nur 6 Diff-Felder) statt dict-je-Zeile → ~12 GB → ~4 GB RSS,
+  Semantik durch Snapshot-Diff-Test gelockt. (d) geplant-Bucket-Daten-Limit dokumentiert (0,65 % Lokation, s. o.).
 - `02_Daten/.venv/` — lokales venv (gitignored), **open-mastr 0.17.1** + Deps installiert
   (System-`python3` hat kein pip → via `get-pip.py` gebootstrappt, kein sudo).
 - **Phase 0 ABGESCHLOSSEN (16.06.):** `build-db` echter Lauf ✅ (Export-DB 8,6 GB, Download 1575 s), `inspect` ✅,
@@ -137,7 +149,7 @@ cd 02_Daten
 .venv/bin/python -m pipeline.cli build-db                       # Export laden (~3 GB; läuft auf ZBook)
 .venv/bin/python -m pipeline.cli inspect                        # Schema gegen config.py prüfen
 .venv/bin/python -m pipeline.cli leads --plz 48,59              # Region → klassifizierte Leads (CSV)
-.venv/bin/python -m unittest discover -s pipeline/tests -p "test_*.py"   # volle Suite (151 Tests)
+.venv/bin/python -m unittest discover -s pipeline/tests -p "test_*.py"   # volle Suite (177 Tests)
 .venv/bin/python -m pipeline.cli signals --gebiet muensterland # T2-Signal-Shipper (cohort+qualify+QA → SignalRecord-CSV)
 .venv/bin/python -m pipeline.cli qa list                       # QA-Queue ansehen (approve/reject/approve-abr)
 .venv/bin/python -m pipeline.cli snapshot                      # schlanker Wochen-Snapshot (D2)

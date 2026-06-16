@@ -25,6 +25,12 @@ bürgersolar
 bürgerenergie
 sunshine
 sunpower
+biogas
+biomasse
+# Wind inkl. Tippfehler ('Windkarft'): 'wind' + irgendwann 'k' (windkraft/windkarft)
+re:wind\w*k
+# 'strom' nur als Wort-Ende (Naturstrom/Ökostrom/X-Strom), nicht 'Stromberg'
+re:strom\b
 # kurze/kollisionsanfällige Tokens nur mit Wortgrenze
 re:\bpv\b
 re:\bpva\b

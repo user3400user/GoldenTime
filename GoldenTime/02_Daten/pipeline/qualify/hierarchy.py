@@ -86,10 +86,14 @@ def _looks_like_person(firmenname: str | None) -> bool:
     """
     if not firmenname:
         return False
-    n = firmenname.strip()
+    # Zweit-Review: Voll-Breiten-Ampersand '＆' (U+FF06) ist im Export 22x häufiger als ASCII '&'
+    # -> normalisieren, sonst rutschen 'Krühler ＆ Sander'-Personengesellschaften ungeflaggt durch.
+    n = firmenname.strip().replace("＆", "&")
     if any(c.isdigit() for c in n) or _FIRMA_TOKEN.search(n):
         return False
-    teile = [t for t in re.split(r"\s*(?:/|&|,|\bund\b|\bu\.\b)\s*", n) if t.strip()]
+    # Trenner: / & , sowie ' und ' / ' u. ' (Letzteres mit korrekter Wortgrenze — \bu\.\b matchte nie,
+    # weil auf '.' ein Leerzeichen folgt). 'Linus u. Astrid Olbrich' wird so als Person erkannt.
+    teile = [t for t in re.split(r"\s*[/&,]\s*|\s+(?:und|u\.)\s+", n) if t.strip()]
     if not (1 <= len(teile) <= 3):
         return False
     for teil in teile:

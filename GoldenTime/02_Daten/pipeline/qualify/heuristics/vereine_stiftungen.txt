@@ -26,3 +26,19 @@ fußballclub
 # Genossenschafts-Suffix ' eG' (Wortgrenze, sonst trifft 'eg' in 'Regina'/'Segeberg')
 re:\beg\b
 re:\be\.\s?g\.
+# Religiöse Orden / Bistümer (KöR + Verein, Zweit-Review-Beleg 'Schwestern vom Guten Hirten')
+orden
+schwestern
+brüder
+provinz
+kloster
+abtei
+konvent
+bistum
+erzbistum
+diözese
+# Genossenschafts-/Filial-Banken (zentrale Beschaffung, §2.3/§2.4) — mit Mensch-QA
+re:\bvr[- ]?bank\b
+re:\bbank\b
+sparkasse
+kreissparkasse

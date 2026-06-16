@@ -39,6 +39,13 @@ class TestPersonNamePattern(unittest.TestCase):
     def test_digit_not_person(self):
         self.assertFalse(H._looks_like_person("Solarpark 7 Betreiber"))
 
+    def test_fullwidth_ampersand_and_abbrev_und(self):
+        # Zweit-Review 3: Voll-Breiten-'＆' (U+FF06) wird normalisiert, sonst rutschte die
+        # Personengesellschaft 'Krühler ＆ Sander' ungeflaggt durch.
+        self.assertTrue(H._looks_like_person("Krühler ＆ Sander"))
+        # 'u.' als Wort-Trenner (das alte \bu\.\b matchte nie, weil auf '.' ein Leerzeichen folgt).
+        self.assertTrue(H._looks_like_person("Linus u. Astrid Olbrich"))
+
 
 class TestMatcherRegex(unittest.TestCase):
     def setUp(self):
@@ -70,6 +77,21 @@ class TestMatcherRegex(unittest.TestCase):
 
     def test_immobilien(self):
         self.assertTrue(self.m("Keller Grundstücksverwaltungsgesellschaft GmbH", "immobilien.txt"))
+
+    def test_zweit_review3_neue_muster(self):
+        # KöR-Wortgrenze (öffentliche Hand) — 'kör' nur als Wort, nicht in 'Körting'/'Akörper'.
+        self.assertTrue(self.m("Studierendenwerk KöR", "oeffentliche_hand.txt"))
+        self.assertFalse(self.m("Körting Hannover GmbH", "oeffentliche_hand.txt"))
+        # Filial-/Genossenschaftsbanken (Verein/zentrale Beschaffung)
+        self.assertTrue(self.m("VR-Bank Mittelhaardt", "vereine_stiftungen.txt"))
+        self.assertTrue(self.m("Kreissparkasse Köln", "vereine_stiftungen.txt"))
+        # Religiöser Orden
+        self.assertTrue(self.m("Schwestern vom Guten Hirten", "vereine_stiftungen.txt"))
+        # Biogas/Biomasse (Energie-/Wettbewerber)
+        self.assertTrue(self.m("Bioenergie Wadersloh Biogas GmbH", "energie_pv_firmen.txt"))
+        # Holding/Beteiligung (Betriebsaufspaltung -> Immobilien-QA)
+        self.assertTrue(self.m("Schmitz Holding GmbH", "immobilien.txt"))
+        self.assertTrue(self.m("Müller Beteiligungsgesellschaft mbH", "immobilien.txt"))
 
 
 class TestEnrichPrecedence(unittest.TestCase):

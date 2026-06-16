@@ -14,3 +14,10 @@ besitz- und verwaltung
 hausverwaltung
 wohnungsbau
 wohnbau
+# Holding/Beteiligung/Vermietung/Invest (Betriebsaufspaltung §2.6 — Pain-Owner woanders), mit QA
+re:\bholding\b
+re:\bbeteiligung
+re:\bvermietung
+re:\binvest\b
+verwaltungs- und beteiligung
+verwaltungsgbr

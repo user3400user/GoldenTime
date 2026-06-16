@@ -12,6 +12,8 @@ landesbetrieb
 bundesanstalt
 körperschaft
 anstalt des öffentlichen rechts
+re:\bkör\b
+k.ö.r.
 # Kliniken / Krankenhäuser (§2.2 nennt 'Klinikum' wörtlich)
 klinik
 klinikum

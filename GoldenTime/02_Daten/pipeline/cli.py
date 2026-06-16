@@ -255,7 +255,12 @@ def cmd_snapshot(args: argparse.Namespace) -> int:
 
 
 def cmd_diff(args: argparse.Namespace) -> int:
-    """Wochen-Diff der zwei jüngsten Snapshots -> diff-basierte Signale (T1/T4 scharf; T5/T6/PV aus)."""
+    """Wochen-Diff der zwei jüngsten Snapshots -> diff-basierte Signale (T1/T4 scharf; T5/T6/PV aus).
+
+    Peak-RAM: ``diff`` lädt beide Snapshots als kompakte Tupel-Dicts (nur die 6 Diff-Felder) — ~4 GB RSS
+    bei ~8,8 Mio Einheiten (Zweit-Review: von ~12 GB gesenkt). Auf dem ZBook unkritisch; ``weekly`` läuft
+    build-db und diff sequenziell, der Export-Speicher ist beim Diff also schon frei.
+    """
     paar = snapstore.latest_two()
     if paar is None:
         print("Weniger als 2 Snapshots vorhanden — erst zweimal `snapshot` (in verschiedenen Wochen) laufen.")
