@@ -14,6 +14,11 @@ __pycache__/
 *.db
 leads_*.csv
 signals_*.csv
+diff_signals_*.csv
+*_lieferbar_*.csv
+*_qa_pending_*.csv
+*_namenlos_*.csv
+*_liefermail_*.txt
 02_Daten/snapshots/
 # Ausnahme: der Config-Store IST versioniert (D3, git-Diff/blame/revert)
 !02_Daten/pipeline/config_store.json

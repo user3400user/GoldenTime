@@ -33,6 +33,7 @@ from .control import config_store as cs
 from .control import state as statemod
 from .control import metrics as metricsmod
 from .enrich import mastr_resolve
+from . import deliver
 
 log = logging.getLogger("pipeline")
 
@@ -350,6 +351,62 @@ def cmd_evidenz_check(args: argparse.Namespace) -> int:
     return 0 if res["fehler"] == 0 else 1
 
 
+def cmd_liefern(args: argparse.Namespace) -> int:
+    """Liefer-Paket für ein Gebiet: getrennte Bucket-CSVs (lieferbar/QA/namenlos) + Liefer-Mail (TEIL 5)."""
+    store = cs.load()
+    g = store.gebiet(args.gebiet)
+    if not g:
+        raise SystemExit(f"Gebiet '{args.gebiet}' nicht im Config-Store ({config.CONFIG_STORE_PATH}).")
+    name = g.get("name", args.gebiet)
+    con = dbmod.connect(args.db)
+    qa_con = statemod.connect()
+    try:
+        b = deliver.run_region(con, qa_con, plz_prefixes=tuple(g.get("plz_prefixes", ())),
+                               region=name, gebiet_id=args.gebiet, resolve=not args.offline)
+    finally:
+        con.close()
+        qa_con.close()
+    slug, heute = _slug(name), dt.date.today().isoformat()
+    outdir = Path(args.out_dir) if args.out_dir else Path(".")
+    outdir.mkdir(parents=True, exist_ok=True)
+    for label, recs in (("lieferbar", b.lieferbar), ("qa_pending", b.pending), ("namenlos", b.namenlos)):
+        if recs:
+            p = outdir / f"{slug}_{label}_{heute}.csv"
+            _write_signals_csv(p, recs)
+            print(f"  {label:10s}: {len(recs):4d} -> {p}")
+    mail = deliver.liefer_mail(b, kaeufer=args.kaeufer, funktion=args.funktion or "Speicher-Installateur")
+    mp = outdir / f"{slug}_liefermail_{heute}.txt"
+    mp.write_text(mail, encoding="utf-8")
+    print(f"  mail      :      -> {mp}")
+    print(f"Gebiet {name}: {len(b.lieferbar)} lieferbar ({b.betriebe()} Betriebe) · {len(b.pending)} QA-pending · "
+          f"{len(b.namenlos)} namenlos · {b.colocated_ausgeschlossen} colocated-ausgeschlossen.")
+    if args.print_mail:
+        print("\n" + "=" * 78 + "\n" + mail)
+    return 0
+
+
+def cmd_mengen(args: argparse.Namespace) -> int:
+    """Ehrlicher Mengen-/Dichte-Report (Betriebe UND Einheiten) je Gebiet (TEIL 5)."""
+    store = cs.load()
+    targets = [store.gebiet(args.gebiet)] if args.gebiet else list(store.active_gebiete())
+    con = dbmod.connect(args.db)
+    qa_con = statemod.connect()
+    buckets = []
+    try:
+        index = build_storage_index(con)
+        for g in targets:
+            if not g:
+                continue
+            buckets.append(deliver.run_region(
+                con, qa_con, plz_prefixes=tuple(g.get("plz_prefixes", ())),
+                region=g.get("name", g["id"]), gebiet_id=g["id"], resolve=False, index=index))
+    finally:
+        con.close()
+        qa_con.close()
+    print(deliver.mengen_report(buckets))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     p = argparse.ArgumentParser(prog="pipeline", description="MaStR-Lead-Pipeline (B-Backbone)")
@@ -386,6 +443,19 @@ def main(argv: list[str] | None = None) -> int:
     se.add_argument("--plz", default="")
     se.add_argument("--sample", type=int, default=10)
     se.set_defaults(func=cmd_evidenz_check)
+
+    sf = sub.add_parser("liefern", help="Liefer-Paket: getrennte Bucket-CSVs + Liefer-Mail (TEIL 5)")
+    sf.add_argument("--gebiet", required=True, help="Gebiet-ID aus dem Config-Store")
+    sf.add_argument("--kaeufer", default="")
+    sf.add_argument("--funktion", default="")
+    sf.add_argument("--out-dir", default="")
+    sf.add_argument("--offline", action="store_true", help="ohne Evidenz-Direktlink-Auflösung")
+    sf.add_argument("--print-mail", action="store_true", help="Liefer-Mail zusätzlich ausgeben")
+    sf.set_defaults(func=cmd_liefern)
+
+    sm = sub.add_parser("mengen", help="ehrlicher Mengen-/Dichte-Report (Betriebe UND Einheiten)")
+    sm.add_argument("--gebiet", default="", help="ein Gebiet (Default: alle aktiven)")
+    sm.set_defaults(func=cmd_mengen)
 
     sq = sub.add_parser("qa", help="Mensch-QA-Gate (D5): Queue / approve / reject / approve-abr")
     sq.add_argument("action", choices=["list", "approve", "reject", "approve-abr"])

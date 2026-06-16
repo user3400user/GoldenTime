@@ -93,6 +93,7 @@ def cohort_signals(
     kwp_max: float = config.KWP_MAX,
     jahrgaenge: tuple[int, ...] = config.POST_EEG_JAHRGAENGE,
     region: str | None = None,
+    stats: dict | None = None,
 ) -> Iterator[SignalRecord]:
     """Erzeuge T2-Kaufsignale (Post-EEG-Kohorte) für eine Region.
 
@@ -172,7 +173,13 @@ def cohort_signals(
         lokation = r.get("lokation_nr")
         status = index.classify(abr, lokation, r.get("speicher_gleicher_ort"))
         if status == COLOCATED:
+            # Transparenz (Zweit-Review): die stille Ausschluss-Menge zählbar machen, statt nur
+            # `continue`. Der Mengen-Report zeigt, wie viele Leads warum verschwinden.
+            if stats is not None:
+                stats["colocated_ausgeschlossen"] = stats.get("colocated_ausgeschlossen", 0) + 1
             continue  # Speicher am Standort gemeldet -> Bedarf gedeckt -> ausschließen
+        if stats is not None:
+            stats["kohorte_kandidaten"] = stats.get("kohorte_kandidaten", 0) + 1
 
         reg = _parse_date(r.get("reg_datum"))
 
