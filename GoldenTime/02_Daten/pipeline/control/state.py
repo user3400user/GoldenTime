@@ -64,6 +64,14 @@ CREATE TABLE IF NOT EXISTS metrics_event (
   erfasst_am  TEXT
 );
 CREATE INDEX IF NOT EXISTS ix_metrics_dim ON metrics_event (gebiet, trigger, metrik, woche);
+
+-- Evidenz-URL-Cache: SEE-Nummer -> interne MaStR-Detail-ID (Resolver). Spart API-Calls; jede
+-- Einheit wird nur einmal aufgelöst, Folgeläufe treffen den Cache.
+CREATE TABLE IF NOT EXISTS mastr_url_cache (
+  einheit_mastr_nr TEXT PRIMARY KEY,
+  detail_id        INTEGER,
+  resolved_at      TEXT
+);
 """
 
 

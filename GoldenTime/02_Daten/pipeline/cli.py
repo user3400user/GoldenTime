@@ -32,6 +32,7 @@ from .ledger import ledger as ledgermod
 from .control import config_store as cs
 from .control import state as statemod
 from .control import metrics as metricsmod
+from .enrich import mastr_resolve
 
 log = logging.getLogger("pipeline")
 
@@ -174,6 +175,12 @@ def cmd_signals(args: argparse.Namespace) -> int:
                 deliver = ledgermod.filter_deliverable(qa_con, deliver, args.kaeufer, args.funktion, gid, "T2")
             deliver.sort(key=lambda r: (r.dv_flag, r.kwp or 0), reverse=True)  # DV + größte zuerst
 
+            # Evidenz-Direktlinks (SEE -> interne MaStR-ID) für die LIEFERBAREN auflösen, gecacht in
+            # pipeline_state.db. Offline/Fehler -> Records behalten den robusten Such-Link (kein Crash).
+            aufgeloest = 0
+            if not args.offline and deliver:
+                aufgeloest = mastr_resolve.EvidenzResolver(cache_con=qa_con).resolve_records(deliver)
+
             for metrik, wert in (("signale", len(records)), ("lieferbar", len(deliver)),
                                  ("pending_qa", len(pending)), ("namenlos", len(namenlos)),
                                  ("dv_flag", sum(r.dv_flag for r in deliver))):
@@ -182,6 +189,9 @@ def cmd_signals(args: argparse.Namespace) -> int:
             print(f"Gebiet {name}: {len(records)} T2-Signale · {len(deliver)} lieferbar · "
                   f"{len(pending)} QA-pending · {len(namenlos)} namenlos (Privatperson) · "
                   f"{len(rejected)} rejected · DV-Flag {sum(r.dv_flag for r in deliver)}.")
+            if deliver and not args.offline:
+                print(f"  Evidenz-Direktlinks: {aufgeloest}/{len(deliver)} aufgelöst "
+                      f"(Rest: robuster Such-Link + SEE-Prüf-Nummer).")
             if deliver:
                 if args.out:
                     base = Path(args.out)
@@ -309,6 +319,37 @@ def cmd_dashboard(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_evidenz_check(args: argparse.Namespace) -> int:
+    """Stichproben-Check der Evidenz-URLs auf Erreichbarkeit (HTTP 200) — TEIL-5-Validierung."""
+    store = cs.load()
+    if args.plz:
+        prefixes = tuple(p.strip() for p in args.plz.split(",") if p.strip())
+    elif args.gebiet and store.gebiet(args.gebiet):
+        prefixes = tuple(store.gebiet(args.gebiet).get("plz_prefixes", ()))
+    else:
+        raise SystemExit("Bitte --gebiet <id> oder --plz <präfixe> angeben.")
+    con = dbmod.connect(args.db)
+    qa_con = statemod.connect()
+    try:
+        index = build_storage_index(con)
+        recs = list(cohort.cohort_signals(con, index, plz_prefixes=prefixes, region="check"))
+        hierarchy.enrich_and_qualify(recs, con)
+        for r in recs:
+            qa_gate.apply_qa(r, qa_con)
+        deliver = [r for r in recs if r.qa_status in (qa_gate.AUTO_OK, qa_gate.APPROVED) and r.entity]
+        mastr_resolve.EvidenzResolver(cache_con=qa_con).resolve_records(deliver)
+        res = mastr_resolve.validate_urls(deliver, sample=args.sample)
+    finally:
+        con.close()
+        qa_con.close()
+    print(f"Evidenz-URL-Check: {res['ok']}/{res['geprueft']} erreichbar (HTTP 200), {res['fehler']} Fehler.")
+    if res.get("hinweis"):
+        print("  " + res["hinweis"])
+    for see, direct, url, code in res["details"]:
+        print(f"  {'direkt' if direct else 'such  '} HTTP {code}  {see}  {url}")
+    return 0 if res["fehler"] == 0 else 1
+
+
 def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     p = argparse.ArgumentParser(prog="pipeline", description="MaStR-Lead-Pipeline (B-Backbone)")
@@ -336,8 +377,15 @@ def main(argv: list[str] | None = None) -> int:
     ss.add_argument("--region-name", default="")
     ss.add_argument("--kaeufer", default="", help="optional: Ledger-Käufer (Exklusivität+Dedupe)")
     ss.add_argument("--funktion", default="", help="optional: Käufer-Funktion fürs Ledger")
+    ss.add_argument("--offline", action="store_true", help="ohne Evidenz-Direktlink-Auflösung (kein Netz)")
     ss.add_argument("--out", default="")
     ss.set_defaults(func=cmd_signals)
+
+    se = sub.add_parser("evidenz-check", help="Stichprobe der Evidenz-URLs auf Erreichbarkeit prüfen")
+    se.add_argument("--gebiet", default="")
+    se.add_argument("--plz", default="")
+    se.add_argument("--sample", type=int, default=10)
+    se.set_defaults(func=cmd_evidenz_check)
 
     sq = sub.add_parser("qa", help="Mensch-QA-Gate (D5): Queue / approve / reject / approve-abr")
     sq.add_argument("action", choices=["list", "approve", "reject", "approve-abr"])

@@ -20,10 +20,13 @@ from dataclasses import dataclass, field
 
 from .. import config
 
-# Öffentliche MaStR-Einheitsseite — die belegbare Evidenz-URL je Einheit (Briefing §5).
-MASTR_EINHEIT_URL = (
-    "https://www.marktstammdatenregister.de/MaStR/Einheit/Detail/IndexOeffentlich/{einheit}"
-)
+# Öffentlicher MaStR-Nachweis (Briefing §5). WICHTIG (Zweit-Review): die Detailseite
+# `IndexOeffentlich/<ID>` braucht eine INTERNE numerische ID, NICHT die SEE-Nummer (SEE -> HTTP 400!)
+# — und die ID liegt nicht im Export. Der Resolver (enrich/mastr_resolve) löst SEE->ID über die
+# MaStR-Web-JSON-API auf (direkter Detail-Link). Ohne Auflösung: robuster Such-Link auf die
+# öffentliche Übersicht + die SEE-Nummer als Prüf-ID (Käufer sucht sie dort).
+MASTR_DETAIL_URL = "https://www.marktstammdatenregister.de/MaStR/Einheit/Detail/IndexOeffentlich/{id}"
+MASTR_SUCHE_URL = "https://www.marktstammdatenregister.de/MaStR/Einheit/Einheiten/OeffentlicheEinheitenuebersicht"
 
 # --- Konfidenz-Modell: Abschläge zentral, nicht verstreut (Briefing §4 Gotchas) ---
 KONF_BASIS = 1.0
@@ -44,9 +47,19 @@ BUY_RELEVANZ = {
 }
 
 
+def mastr_detail_url(detail_id: int | str) -> str:
+    """Direkter öffentlicher Detail-Link (interne MaStR-ID, vom Resolver aufgelöst)."""
+    return MASTR_DETAIL_URL.format(id=detail_id)
+
+
+def mastr_suchlink(einheit_mastr_nr: str | None = None) -> str:
+    """Robuster Fallback-Evidenzlink: öffentliche Übersicht — der Käufer sucht die SEE-Prüf-Nummer."""
+    return MASTR_SUCHE_URL
+
+
 def mastr_einheit_url(einheit_mastr_nr: str | None) -> str:
-    """Öffentliche MaStR-Detailseite zur Einheit (Evidenz-URL, 1-Klick-Verifikation)."""
-    return MASTR_EINHEIT_URL.format(einheit=einheit_mastr_nr or "")
+    """Evidenz-URL je Einheit: ohne aufgelöste ID der robuste Such-Link (kein toter SEE-Direktlink)."""
+    return mastr_suchlink(einheit_mastr_nr)
 
 
 def compute_konfidenz(
@@ -102,6 +115,7 @@ class SignalRecord:
     qa_status: str = "auto_ok"       # auto_ok | pending | approved | rejected
     geprueft_am: str = field(default_factory=lambda: dt.date.today().isoformat())
     provenance: str = ""
+    detail_id: int | None = None     # interne MaStR-ID (Resolver) -> direkter Evidenz-Detail-Link
 
     def __post_init__(self) -> None:
         if not self.einheit_mastr_nr:
@@ -113,7 +127,8 @@ class SignalRecord:
 
     @property
     def evidenz_url(self) -> str:
-        return mastr_einheit_url(self.einheit_mastr_nr)
+        """Direkter Detail-Link, wenn detail_id (Resolver) gesetzt ist; sonst robuster Such-Link."""
+        return mastr_detail_url(self.detail_id) if self.detail_id else mastr_suchlink(self.einheit_mastr_nr)
 
     # CSV-Spaltenreihenfolge der Lieferung (frischeste/heißeste oben sortiert der Aufrufer).
     CSV_FIELDS = (

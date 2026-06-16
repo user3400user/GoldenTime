@@ -50,11 +50,18 @@ class TestKonfidenzPflicht(unittest.TestCase):
 
 
 class TestEvidenzUrl(unittest.TestCase):
-    def test_url_built_from_einheit(self):
+    def test_default_is_robust_search_link(self):
+        # Zweit-Review: KEIN toter SEE-Direktlink (IndexOeffentlich/<SEE> -> HTTP 400). Default =
+        # robuster Such-Link auf die öffentliche Übersicht.
         r = SignalRecord("SEE900000123", "ABR1", "T2", "2006-01-01", 0.9, "x")
-        self.assertIn("SEE900000123", r.evidenz_url)
         self.assertTrue(r.evidenz_url.startswith("https://www.marktstammdatenregister.de/"))
-        self.assertEqual(mastr_einheit_url("SEE900000123"), r.evidenz_url)
+        self.assertIn("OeffentlicheEinheitenuebersicht", r.evidenz_url)
+        self.assertNotIn("IndexOeffentlich/SEE", r.evidenz_url)
+
+    def test_resolved_detail_id_gives_direct_link(self):
+        r = SignalRecord("SEE900000123", "ABR1", "T2", "2006-01-01", 0.9, "x")
+        r.detail_id = 1796071   # vom Resolver gesetzt
+        self.assertIn("IndexOeffentlich/1796071", r.evidenz_url)
 
 
 class TestKonfidenzModell(unittest.TestCase):
