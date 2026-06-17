@@ -65,7 +65,7 @@ die generische `backbone/`-Umstrukturierung (wind/biomass) kommt erst in Phase 2
 - **D5 · QA-Gate:** Tabelle **`qa_decision`** in `pipeline_state.db`, Key = **EinheitMastrNummer**; nur
   *geflaggte* Grenzfälle in der Queue (`QA_FLAGS`); Entscheidung *hält über Wochenläufe*; **Re-Review nur bei
   Fingerprint-Änderung** (load-bearing: betreiber, abr, personenart, speicher_status, kWp-Band — NICHT Frische).
-  Batch-CLI `qa list/approve/reject/approve-abr` jetzt, Dashboard-Tab Phase 3. `auto_ok` (kein QA-Flag) liefert
+  Batch-CLI `qa list/suggest/approve/reject/approve-abr` jetzt (`suggest` = gruppierte Vorschläge), Dashboard-Tab Phase 3. `auto_ok` (kein QA-Flag) liefert
   sofort → Queue bremst die Demo nicht.
 
 ## Phase-0-Schema-Befund (open-mastr 0.17.1 Bulk-SQLite — EMPIRISCH per `inspect`+Inventar 16.06.)
@@ -95,7 +95,7 @@ aus dem Quellcode vermuteten deutschen XSD-Namen waren over-thought — `inspect
 - `02_Daten/pipeline/` — **PULL steht** (Export-Adapter + ABR-Speicher-Anywhere + Normalisierung + CLI).
   **Neu (Session 1):** `signal/` (K5 SignalRecord + from_lead, Konfidenz=Pflicht) · `control/` (D3 config_store
   + D1/D5/D6 `pipeline_state.db`, WAL) · `config_store.json` (versioniert). **36 Tests grün** (stdlib).
-  **Gebaut + integriert + ZWEIT-REVIEW-gehärtet, 191 Tests grün:** register(D4) · snapshot+diff(K2) ·
+  **Gebaut + integriert + ZWEIT-REVIEW-gehärtet, 313 Tests grün:** register(D4) · snapshot+diff(K2) ·
   triggers cohort/diff_based(K3) · qualify+QA(K4/D5) · ledger(K6) · enrich(K7) + evidenz-resolver ·
   dashboard(K8) · deliver(TEIL 5). CLI: `signals`/`qa`/`snapshot`/`diff`/`ledger`/`dashboard`/`liefern`/
   `mengen`/`evidenz-check`/**`weekly`**/**`gate-demo`**. Eigene `pipeline/README.md`.
@@ -148,7 +148,7 @@ aus dem Quellcode vermuteten deutschen XSD-Namen waren over-thought — `inspect
   - **R3c Dashboard-Politur (85aa73e):** Monitoring jetzt Trichter je Gebiet×Trigger (Metriken als Spalten)
     + Ausbeute % + Frische; Gebiete-Block zeigt `effective_trigger`. (Nicht umgesetzt: `latest_by_dimension`
     = redundant; Liefer-Protokoll-Ansicht = `record_delivery` ungenutzt → leer.)
-- **Autonomer R4-Loop (16.06., finale Review-Workflow + Direkt-Fixes, 191 Tests grün, Commit `eb316b7`):**
+- **Autonomer R4-Loop (16.06., finale Review-Workflow + Direkt-Fixes, 313 Tests grün, Commit `eb316b7`):**
   5-Dim-Review (5 Skeptiker-verifiziert) fand 7 Rest-Defekte → behoben:
   - **[HIGH, business-shifting] Rechtsform-Katalog-Drift:** echter Wert `'Stiftung  des öffentlichen Rechts'`
     hat ZWEI Leerzeichen → Key matchte nie; `_rechtsform_flag` kollabiert jetzt Whitespace + normalisiert
@@ -161,7 +161,7 @@ aus dem Quellcode vermuteten deutschen XSD-Namen waren over-thought — `inspect
   - **DEFERRED (dokumentiert, vetobar):** `record_delivery`/`reserve`-Verdrahtung (business-shifting, Demo-vs-Real-
     Design nötig — Top-Post-Essen-Item: ohne sie sind Dashboard-Exklusivität + Dedupe-Versprechen leer) ·
     FLUSS T1/T4 erst nach 2. Snapshot (zeitlich) · CSV-Konfidenz-Inline-Disclaimer (durch `konfidenz_gruende` gemildert).
-- **R6 Bug+Optimierungs-Jagd (16.06., Workflow 6 Finder × Skeptiker, 191 Tests grün, Commit `28a9fcd`):**
+- **R6 Bug+Optimierungs-Jagd (16.06., Workflow 6 Finder × Skeptiker, 313 Tests grün, Commit `28a9fcd`):**
   6 Bugs + 5 Opt gefunden (weniger-reviewte Winkel), die wirkungsvollen behoben:
   - **[HIGH] `write_snapshot` jetzt ATOMAR** (temp + `os.replace`): ein Teil-Abbruch (I/O/OOM/Sleep/Ctrl-C)
     zerstörte vorher via `unlink`+In-Place die Diff-Baseline → Diff gegen leeren Snapshot. + streamt jetzt
@@ -174,6 +174,18 @@ aus dem Quellcode vermuteten deutschen XSD-Namen waren over-thought — `inspect
   - **[LOW/MED] `_in_betrieb`-toter-Vergleich gefixt; Metrik-Clobber** (cmd_signals post-Ledger vs run_region
     pre-Ledger) → beide schreiben jetzt die rohe Dichte. **DEFERRED:** LIKE-Escape im PLZ-Filter (PLZ=Ziffern,
     0 reale Wirkung); cohort-Single-Scan über mehrere Gebiete (risk=medium, invasiv).
+- **R7 Sprint A/B/C (17.06., Workflow 5 Agenten + Direkt-Implementierung, 313 Tests grün, Commit `16ce7f2`):**
+  - **A `qa suggest`:** read-only Vor-dem-Essen-Helfer — gruppiert Pending nach Flag-Muster (+ Histogramm),
+    je Fall Empfehlung (restriktivste gewinnt: Reject>Prüfen>Premium → e.V.+Premium rutscht NICHT durch) +
+    Direkt-Link + Copy-Paste-`qa reject … --grund`. NIE Auto-Entscheid. Live verifiziert.
+  - **B Test-Coverage +116:** `test_normalize.py` (59), `test_db.py` (32, case-insens. Resolver),
+    `test_cli.py` (25, argparse-Dispatch + cmd_qa/signals/mengen gegen synthet. DBs). 191→**313 Tests**.
+  - **C2:** `metrics.latest_by_dimension` (war unverdrahtet) → Dashboard-Block 'Aktueller Stand je Dimension'.
+  - **C3:** LIKE-Region-Filter ehrlich abgesichert (Ziffern-Invariante in config_store._validate +
+    cli._plz_prefixes, 3 Stellen dokumentiert) statt escaped — PLZ=Ziffern → kein %/_.
+  - **DEFERRED (C1, begründet):** cohort-Single-Scan — Workflow-Entwurf `run_region_multi` hätte
+    `colocated_ausgeschlossen` still auf 0 regressiert (ehrliche coloc-aus-Spalte!) für modesten Perf-Gewinn
+    auf Nicht-Hot-Path → bewusst vertagt statt Ehrlichkeits-Kennzahl zu verlieren.
 - `02_Daten/.venv/` — lokales venv (gitignored), **open-mastr 0.17.1** + Deps installiert
   (System-`python3` hat kein pip → via `get-pip.py` gebootstrappt, kein sudo).
 - **Phase 0 ABGESCHLOSSEN (16.06.):** `build-db` echter Lauf ✅ (Export-DB 8,6 GB, Download 1575 s), `inspect` ✅,
@@ -197,7 +209,7 @@ cd 02_Daten
 .venv/bin/python -m pipeline.cli build-db                       # Export laden (~3 GB; läuft auf ZBook)
 .venv/bin/python -m pipeline.cli inspect                        # Schema gegen config.py prüfen
 .venv/bin/python -m pipeline.cli leads --plz 48,59              # Region → klassifizierte Leads (CSV)
-.venv/bin/python -m unittest discover -s pipeline/tests -p "test_*.py"   # volle Suite (191 Tests)
+.venv/bin/python -m unittest discover -s pipeline/tests -p "test_*.py"   # volle Suite (313 Tests)
 .venv/bin/python -m pipeline.cli signals --gebiet muensterland # T2-Signal-Shipper (cohort+qualify+QA → SignalRecord-CSV)
 .venv/bin/python -m pipeline.cli qa list                       # QA-Queue ansehen (approve/reject/approve-abr)
 .venv/bin/python -m pipeline.cli snapshot                      # schlanker Wochen-Snapshot (D2)
