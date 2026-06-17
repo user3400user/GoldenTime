@@ -18,8 +18,11 @@ from __future__ import annotations
 
 import datetime as dt
 import logging
+import os
 import re
 import sqlite3
+import tempfile
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -119,7 +122,7 @@ def _resolve_stand_datum(con: sqlite3.Connection, datum: str | None) -> str:
     return dt.date.today().isoformat()
 
 
-def _read_traeger_rows(con: sqlite3.Connection, traeger: str) -> list[tuple]:
+def _read_traeger_rows(con: sqlite3.Connection, traeger: str) -> Iterator[tuple]:
     """Lese die Diff-Schlüsselfelder einer Träger-Tabelle als (Feld-Reihenfolge)-Tupel.
 
     Schema-tolerant: fehlt eine optionale Spalte (z. B. eeg_nr auf storage), wird im
@@ -144,16 +147,15 @@ def _read_traeger_rows(con: sqlite3.Connection, traeger: str) -> list[tuple]:
     if not einheit_real:
         log.warning("Träger '%s' (Tabelle '%s') ohne EinheitMastrNummer — übersprungen.",
                     traeger, table)
-        return []
+        return
 
     sql = "SELECT " + ", ".join(select_parts) + f' FROM "{table}"'
-    rows: list[tuple] = []
     for row in con.execute(sql):
         d = dict(row)
         einheit = d.get("einheit_nr")
         if not einheit:                       # ohne PK keine Diff-Identität -> raus
             continue
-        rows.append((
+        yield (
             einheit,
             traeger,                          # Herkunfts-Träger (kein DB-Feld)
             d.get("abr"),
@@ -163,8 +165,7 @@ def _read_traeger_rows(con: sqlite3.Connection, traeger: str) -> list[tuple]:
             d.get("datum_stilllegung_endg"),
             d.get("datum_stilllegung_vorueb"),
             d.get("betriebsstatus"),
-        ))
-    return rows
+        )
 
 
 def write_snapshot(
@@ -193,27 +194,34 @@ def write_snapshot(
         out = Path(out_path)
         out.parent.mkdir(parents=True, exist_ok=True)
 
-    if out.exists():
-        out.unlink()                          # idempotent: neuen Stand sauber neu schreiben
-
-    snap = sqlite3.connect(str(out))
+    # Atomar schreiben (Opt-Hunt/BUG): erst in eine Temp-Datei im selben Verzeichnis, dann os.replace.
+    # Ein Teil-Abbruch (I/O-Fehler, OOM, Laptop-Sleep, Ctrl-C) lässt die alte Baseline UNANGETASTET,
+    # statt sie via vorab-unlink + in-place-Schreiben zu zerstören (sonst: Diff gegen leeren Snapshot).
+    placeholders = ", ".join("?" for _ in SNAPSHOT_FIELDS)
+    insert_sql = (f"INSERT OR REPLACE INTO snapshot ({', '.join(SNAPSHOT_FIELDS)}) "
+                  f"VALUES ({placeholders})")
+    tmp_fd, tmp_name = tempfile.mkstemp(dir=str(out.parent), prefix=out.name + ".", suffix=".tmp")
+    os.close(tmp_fd)
+    tmp = Path(tmp_name)
+    snap = sqlite3.connect(str(tmp))
     try:
         snap.execute(_CREATE_SQL)
         total = 0
-        placeholders = ", ".join("?" for _ in SNAPSHOT_FIELDS)
         for t in traeger:
-            rows = _read_traeger_rows(con, t)
-            snap.executemany(
-                f"INSERT OR REPLACE INTO snapshot ("
-                f"{', '.join(SNAPSHOT_FIELDS)}) VALUES ({placeholders})",
-                rows,
-            )
-            total += len(rows)
+            n_before = snap.total_changes
+            # _read_traeger_rows ist ein Generator -> executemany streamt (keine 6,2-Mio-Zeilen-Liste
+            # mit ~2,5 GB Peak im RAM, Opt-Hunt). total_changes zählt die Inserts (Träger disjunkt).
+            snap.executemany(insert_sql, _read_traeger_rows(con, t))
+            total += snap.total_changes - n_before
         snap.commit()
-        log.info("Snapshot %s geschrieben: %d Einheiten (Träger=%s).",
-                 out.name, total, ",".join(traeger))
-    finally:
+    except BaseException:                      # auch KeyboardInterrupt -> Teil-Snapshot wegwerfen
         snap.close()
+        tmp.unlink(missing_ok=True)
+        raise
+    snap.close()
+    os.replace(str(tmp), str(out))             # atomar an die finale Stelle (alte Baseline ersetzt)
+    log.info("Snapshot %s geschrieben: %d Einheiten (Träger=%s).",
+             out.name, total, ",".join(traeger))
     return out
 
 

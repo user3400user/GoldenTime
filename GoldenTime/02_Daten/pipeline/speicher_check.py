@@ -111,60 +111,43 @@ def build_storage_index(
     # colocated/Anywhere-Ausschluss. Ein STILLGELEGTER/geplanter Speicher schloss sonst valide
     # PV-Leads fälschlich aus — toter Speicher = bester Nachrüst-Lead, kein Ausschluss-Grund.
     # (Belegt: SEE955882610581 wurde wegen einer 2023 endgültig stillgelegten Batterie verworfen.)
-    status_where, status_params = "", []
-    if status_col:
-        status_where = f' AND "{status_col}" = ?'
-        status_params = [config.BETRIEBSSTATUS_IN_BETRIEB]
-    else:
+    # Direkter Back-Link Speicher -> co-registrierte Solar-Einheit (GemeinsamRegistrierteSolareinheit-
+    # MastrNummer) fängt co-lokale Paare mit abweichender Lokation (Zweit-Review-Fix).
+    gem_col = dbmod.resolve_column(cols, "gem_solar_nr")
+    if not sel_col:
+        log.warning("Speicher-Tabelle '%s' ohne Lokations-Spalte — "
+                    "co-lokaler Check nur über SpeicherAmGleichenOrt.", table)
+    if not status_col:
         log.warning("Speicher-Tabelle '%s' ohne Betriebsstatus-Spalte — "
                     "stillgelegte Speicher können nicht ausgefiltert werden.", table)
 
-    operators = {
-        r[0]
-        for r in con.execute(
-            f'SELECT DISTINCT "{abr_col}" FROM "{table}" '
-            f'WHERE "{abr_col}" IS NOT NULL AND "{abr_col}" <> \'\'' + status_where,
-            status_params,
-        )
-    }
+    operators: set[str] = set()
     locations: set[str] = set()
-    if sel_col:
-        locations = {
-            r[0]
-            for r in con.execute(
-                f'SELECT DISTINCT "{sel_col}" FROM "{table}" '
-                f'WHERE "{sel_col}" IS NOT NULL AND "{sel_col}" <> \'\'' + status_where,
-                status_params,
-            )
-        }
-    else:
-        log.warning("Speicher-Tabelle '%s' ohne Lokations-Spalte — "
-                    "co-lokaler Check nur über SpeicherAmGleichenOrt.", table)
-
-    # Direkter Back-Link Speicher -> co-registrierte Solar-Einheit (GemeinsamRegistrierteSolar-
-    # einheitMastrNummer). Fängt co-lokale Paare mit abweichender Lokation (Zweit-Review-Fix).
-    gem_col = dbmod.resolve_column(cols, "gem_solar_nr")
-
-    def _distinct(col, extra_where, extra_params):
-        if not col:
-            return set()
-        return {
-            r[0]
-            for r in con.execute(
-                f'SELECT DISTINCT "{col}" FROM "{table}" '
-                f'WHERE "{col}" IS NOT NULL AND "{col}" <> \'\'' + extra_where, extra_params)
-        }
-
-    colocated_solar = _distinct(gem_col, status_where, status_params)
-
-    # Geplante Speicher (Status 'In Planung'): eigener Bucket-Index (Lokation + co-reg. Solar) —
-    # NICHT Ausschluss (kein In-Betrieb-Speicher), aber auch nicht heiß (kriegen ja gerade einen).
+    colocated_solar: set[str] = set()        # In-Betrieb-Speicher (Ausschluss-Sets)
     geplant_locations: set[str] = set()
-    geplant_solar: set[str] = set()
-    if status_col:
-        gp_where, gp_params = f' AND "{status_col}" = ?', [config.STORAGE_GEPLANT_STATUS]
-        geplant_locations = _distinct(sel_col, gp_where, gp_params)
-        geplant_solar = _distinct(gem_col, gp_where, gp_params)
+    geplant_solar: set[str] = set()          # 'In Planung'-Speicher (eigener Bucket, nicht heiß)
+    in_betrieb = str(config.BETRIEBSSTATUS_IN_BETRIEB)
+    geplant = str(config.STORAGE_GEPLANT_STATUS)
+
+    # Opt-Hunt: EIN Voll-Scan über storage_extended (2,58 Mio) statt 5 separater DISTINCT-Scans
+    # (~16 s -> ~3 s je Wochenlauf). Partitionierung In Betrieb / In Planung in Python; Sets dedupen.
+    sel_expr = f'"{sel_col}"' if sel_col else "NULL"
+    gem_expr = f'"{gem_col}"' if gem_col else "NULL"
+    status_expr = f'"{status_col}"' if status_col else "NULL"
+    for abr, sel, gem, status in con.execute(
+            f'SELECT "{abr_col}", {sel_expr}, {gem_expr}, {status_expr} FROM "{table}"'):
+        if status_col is None or status == in_betrieb:   # In Betrieb (bzw. alles, wenn kein Status)
+            if abr:
+                operators.add(abr)
+            if sel:
+                locations.add(sel)
+            if gem:
+                colocated_solar.add(gem)
+        elif status == geplant:
+            if sel:
+                geplant_locations.add(sel)
+            if gem:
+                geplant_solar.add(gem)
 
     log.info("Speicher-Index aus '%s': %d Betreiber, %d Lok., %d co-reg. Solar (In Betrieb); "
              "%d Lok. + %d Solar geplant.", table, len(operators), len(locations),

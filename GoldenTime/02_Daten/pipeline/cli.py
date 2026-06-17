@@ -174,6 +174,10 @@ def cmd_signals(args: argparse.Namespace) -> int:
             namenlos = [r for r in rest if not r.entity]
             pending = [r for r in rest if r.qa_status == qa_gate.PENDING]
             rejected = [r for r in rest if r.qa_status == qa_gate.REJECTED]
+            # Monitoring-Metrik = ROHE lieferbare Dichte (vor käuferspezifischem Ledger-Dedup), damit
+            # sie mit deliver.run_region/_record_metrics konsistent ist (Bug-Hunt: sonst clobbern sich
+            # die 'lieferbar'/'dv_flag'-Werte je nachdem, welcher Befehl zuletzt für Gebiet/Woche lief).
+            roh_lieferbar, roh_dv = len(deliver), sum(r.dv_flag for r in deliver)
             if args.kaeufer and args.funktion:   # optionales Ledger-Gate (Exklusivität + Dedupe)
                 deliver = ledgermod.filter_deliverable(qa_con, deliver, args.kaeufer, args.funktion, gid, "T2")
             deliver.sort(key=lambda r: (r.dv_flag, r.kwp or 0), reverse=True)  # DV + größte zuerst
@@ -184,10 +188,10 @@ def cmd_signals(args: argparse.Namespace) -> int:
             if not args.offline and deliver:
                 aufgeloest = mastr_resolve.EvidenzResolver(cache_con=qa_con).resolve_records(deliver)
 
-            for metrik, wert in (("signale", len(records)), ("lieferbar", len(deliver)),
+            for metrik, wert in (("signale", len(records)), ("lieferbar", roh_lieferbar),
                                  ("pending_qa", len(pending)), ("namenlos", len(namenlos)),
                                  ("speicher_geplant", len(geplant)),
-                                 ("dv_flag", sum(r.dv_flag for r in deliver))):
+                                 ("dv_flag", roh_dv)):
                 metricsmod.record(qa_con, metrik=metrik, wert=wert, woche=woche, gebiet=gid, trigger="T2")
 
             print(f"Gebiet {name}: {len(records)} T2-Signale · {len(deliver)} lieferbar · "

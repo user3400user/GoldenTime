@@ -93,7 +93,9 @@ def _in_betrieb(status: object) -> bool:
     if status in (None, ""):
         return True  # unbekannt nicht wegwerfen
     s = str(status).strip().lower()
-    return s == str(config.BETRIEBSSTATUS_IN_BETRIEB) or s.startswith("in betrieb")
+    # config-Wert ebenfalls lowern (Bug-Hunt: 'In Betrieb' != 'in betrieb' — der Exakt-Vergleich war
+    # toter Code, nur startswith trug). Robust bei künftiger Status-/Config-Änderung.
+    return s == str(config.BETRIEBSSTATUS_IN_BETRIEB).lower() or s.startswith("in betrieb")
 
 
 def iter_leads(

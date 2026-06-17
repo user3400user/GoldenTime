@@ -229,5 +229,41 @@ class TestStorageBetriebsstatus(unittest.TestCase):
         self.assertEqual(idx.classify("ABR_PV", "SEL_LIVE", None), COLOCATED)
 
 
+class TestQaGateStoredDecision(unittest.TestCase):
+    """Bug-Hunt: ein gespeicherter QA-Entscheid hält, auch wenn die Flags im Folgelauf nicht feuern."""
+
+    def _rec(self, see, abr, entity, flags=()):
+        r = SignalRecord(see, abr, "T2", "2006-01-01", 0.9, "x", entity=entity, kwp=100.0)
+        r.flags = tuple(flags)
+        return r
+
+    def test_gespeicherter_reject_haelt_auch_ohne_flag(self):
+        import pathlib
+        import tempfile
+        from pipeline.control import state
+        with tempfile.TemporaryDirectory() as d:
+            con = state.connect(pathlib.Path(d) / "s.db")
+            # Woche 1: geflaggt -> pending -> vom Menschen abgelehnt.
+            r1 = self._rec("SEE1", "ABR1", "Stadtwerke X", flags=("OEFFENTLICH_PRUEFEN",))
+            self.assertEqual(qa_gate.apply_qa(r1, con), "pending")
+            qa_gate.reject(con, "SEE1", "oeffentlich")
+            # Woche 2: SELBER Lead, aber Flag feuert nicht mehr (Heuristik editiert / Join-Ausfall).
+            # Frueher Bug: -> auto_ok -> wieder ausgeliefert. Jetzt: gespeicherter 'rejected' haelt.
+            r2 = self._rec("SEE1", "ABR1", "Stadtwerke X", flags=())
+            self.assertEqual(qa_gate.apply_qa(r2, con), "rejected")
+            self.assertEqual(r2.qa_status, "rejected")
+            con.close()
+
+    def test_kein_eintrag_ohne_flag_bleibt_auto_ok(self):
+        import pathlib
+        import tempfile
+        from pipeline.control import state
+        with tempfile.TemporaryDirectory() as d:
+            con = state.connect(pathlib.Path(d) / "s.db")
+            r = self._rec("SEE9", "ABR9", "Müller GmbH", flags=())
+            self.assertEqual(qa_gate.apply_qa(r, con), "auto_ok")    # Normalfall unverändert
+            con.close()
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

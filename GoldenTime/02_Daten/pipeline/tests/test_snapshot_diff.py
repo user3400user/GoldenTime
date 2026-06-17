@@ -107,6 +107,31 @@ class TestWriteSnapshot(unittest.TestCase):
             # storage hat kein eeg_nr -> NULL-Literal, kein Crash
             self.assertIsNone(byid["SSE1"]["eeg_nr"])
 
+    def test_atomar_baseline_ueberlebt_fehler_mitten_im_schreiben(self):
+        # Bug-Hunt: ein Fehler MITTEN im Schreiben (hier 2. Träger unbekannt) darf die alte Baseline
+        # NICHT zerstören (atomic write via temp + os.replace), und kein .tmp-Müll bleibt liegen.
+        with tempfile.TemporaryDirectory() as d:
+            src = Path(d) / "open-mastr.db"
+            _build_source_db(src)
+            con = sqlite3.connect(str(src))
+            con.row_factory = sqlite3.Row
+            out = Path(d) / "snap.sqlite"
+
+            def _count(p):
+                c = sqlite3.connect(str(p))
+                n = c.execute("SELECT COUNT(*) FROM snapshot").fetchone()[0]
+                c.close()
+                return n
+
+            store.write_snapshot(con, out_path=out, datum="2026-06-16", traeger=("solar",))
+            self.assertEqual(_count(out), 2)                       # gültige Baseline (2 Solar)
+            with self.assertRaises(Exception):                    # 2. Träger unbekannt -> Abbruch
+                store.write_snapshot(con, out_path=out, datum="2026-06-16",
+                                     traeger=("solar", "UNBEKANNT"))
+            con.close()
+            self.assertEqual(_count(out), 2)                      # Baseline UNVERÄNDERT, nicht leer
+            self.assertEqual(list(Path(d).glob("*.tmp")), [])     # kein Temp-Müll
+
     def test_default_path_uses_snapshot_dir_and_datum(self):
         with tempfile.TemporaryDirectory() as d:
             src = Path(d) / "open-mastr.db"

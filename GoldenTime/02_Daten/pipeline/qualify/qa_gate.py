@@ -8,10 +8,11 @@ Wochenläufe** — sie wird NUR neu fällig, wenn sich der **Fingerprint** ände
 entity · betreiber_mastr_nr · PersonenArt-Proxy · speicher_status · kWp-Band relativ KWP_MIN/MAX —
 bewusst NICHT Frische/Datum, sonst würde jede Re-Registrierung die Entscheidung wegwerfen).
 
-Schreib-Logik (apply_qa):
-  needs_qa False                              -> 'auto_ok'  (nichts gespeichert)
-  needs_qa True, kein Eintrag                 -> 'pending'  (Eintrag angelegt)
-  Eintrag, fingerprint GLEICH                 -> gespeicherter status HÄLT ('approved'/'rejected'/'pending')
+Schreib-Logik (apply_qa) — ein gespeicherter Entscheid hat IMMER Vorrang vor den aktuellen Flags:
+  kein Eintrag, needs_qa False                -> 'auto_ok'  (nichts gespeichert)
+  kein Eintrag, needs_qa True                 -> 'pending'  (Eintrag angelegt)
+  Eintrag, fingerprint GLEICH                 -> gespeicherter status HÄLT ('approved'/'rejected'/'pending'),
+                                                 auch wenn die Flags diesmal NICHT feuern (Bug-Hunt-Fix)
   Eintrag, fingerprint ANDERS (load-bearing)  -> invalidieren -> 'pending' (neuer Fingerprint)
 
 Batch-CLI-Aktionen: approve / reject / approve_abr (Sammelaktion je Betreiber) / list_queue.
@@ -87,32 +88,33 @@ def apply_qa(record: SignalRecord, con: sqlite3.Connection) -> str:
 
     Siehe Modul-Docstring für die Statuslogik. Gibt den gesetzten Status zurück (= record.qa_status).
     """
-    if not needs_qa(record):
-        record.qa_status = AUTO_OK
-        return AUTO_OK
-
-    fp = fingerprint(record)
-    flags_join = "|".join(record.flags)
     row = con.execute(
         "SELECT status, fingerprint FROM qa_decision WHERE einheit_mastr_nr = ?",
         (record.einheit_mastr_nr,),
     ).fetchone()
 
     if row is None:
-        # Erstkontakt eines Grenzfalls -> in die Queue.
+        # KEIN gespeicherter Entscheid: nur geflaggte Grenzfälle in die Queue, der Rest ist auto_ok.
+        if not needs_qa(record):
+            record.qa_status = AUTO_OK
+            return AUTO_OK
+        fp = fingerprint(record)
         con.execute(
             "INSERT INTO qa_decision "
             "(einheit_mastr_nr, betreiber_mastr_nr, status, flags_at_review, fingerprint, "
             " entschieden_am) VALUES (?,?,?,?,?,?)",
             (record.einheit_mastr_nr, record.betreiber_mastr_nr, PENDING,
-             flags_join, fp, None),
+             "|".join(record.flags), fp, None),
         )
         con.commit()
         record.qa_status = PENDING
         return PENDING
 
+    # Ein gespeicherter Entscheid HÄLT, bis sich der Fingerprint ändert (D5) — UNABHÄNGIG davon, ob die
+    # Flags diesmal feuern (Bug-Hunt-Fix): sonst würde ein abgelehnter Lead wieder ausgeliefert, sobald
+    # der market_actors-Namens-Join ausfällt oder ein Heuristik-Muster editiert/entfernt wird.
+    fp = fingerprint(record)
     if row["fingerprint"] == fp:
-        # Nichts Load-bearing geändert -> gespeicherte Entscheidung HÄLT.
         record.qa_status = row["status"]
         return row["status"]
 
@@ -120,7 +122,7 @@ def apply_qa(record: SignalRecord, con: sqlite3.Connection) -> str:
     con.execute(
         "UPDATE qa_decision SET status = ?, flags_at_review = ?, fingerprint = ?, "
         "grund = NULL, entschieden_am = NULL WHERE einheit_mastr_nr = ?",
-        (PENDING, flags_join, fp, record.einheit_mastr_nr),
+        (PENDING, "|".join(record.flags), fp, record.einheit_mastr_nr),
     )
     con.commit()
     record.qa_status = PENDING
