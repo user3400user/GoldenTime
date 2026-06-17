@@ -75,7 +75,7 @@ def _truthy(value: str) -> bool:
 
 # --- Daten-Sammlung fürs Rendering (read-only) ----------------------------------------------
 
-def gather_view_data() -> tuple[cs.ConfigStore, list[dict], list[dict]]:
+def gather_view_data() -> tuple[cs.ConfigStore, list[dict], list[dict], list, list]:
     """Lädt alles, was render_dashboard braucht: Config + aggregierte Metriken + Ledger-Overview.
 
     Metriken/Ledger über ``state.connect_readonly()`` (nebenläufig zur schreibenden Pipeline,
@@ -90,17 +90,19 @@ def gather_view_data() -> tuple[cs.ConfigStore, list[dict], list[dict]]:
     metrics_rows: list[dict] = []
     ledger_rows: list[dict] = []
     qa_rows: list = []
+    latest_rows: list = []
     try:
         con = state.connect_readonly()
         try:
             metrics_rows = metrics.aggregate(con)
+            latest_rows = metrics.latest_by_dimension(con)
             ledger_rows = ledger.overview(con)
             qa_rows = state.qa_pending(con)
         finally:
             con.close()
     except Exception as e:  # noqa: BLE001 — Dashboard darf nie wegen State-IO crashen
         log.warning("Dashboard: State-Lesen fehlgeschlagen (%s) — zeige leere Tabellen.", e)
-    return store, metrics_rows, ledger_rows, qa_rows
+    return store, metrics_rows, ledger_rows, qa_rows, latest_rows
 
 
 # --- HTTP-Hülle ------------------------------------------------------------------------------
@@ -128,8 +130,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
         if self.path not in ("/", "/index.html"):
             self._send_html("<h1>404</h1>", status=404)
             return
-        store, metrics_rows, ledger_rows, qa_rows = gather_view_data()
-        self._send_html(views.render_dashboard(store, metrics_rows, ledger_rows, qa_rows))
+        store, metrics_rows, ledger_rows, qa_rows, latest_rows = gather_view_data()
+        self._send_html(views.render_dashboard(store, metrics_rows, ledger_rows, qa_rows, latest_rows))
 
     def do_POST(self) -> None:  # noqa: N802
         if self.path != "/toggle":

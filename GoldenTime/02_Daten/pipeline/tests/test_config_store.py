@@ -57,6 +57,19 @@ class TestLoad(unittest.TestCase):
             self.assertIn("doppelte gebiet.id", msg)
 
 
+    def test_plz_prefixes_muss_ziffern_sein(self):
+        # C3: Buchstaben-Präfix -> Validierungsfehler (sichert den escapefreien SQL-LIKE-Region-Filter).
+        raw = {
+            "schema_version": cs.SCHEMA_VERSION,
+            "triggers": {}, "modules": {},
+            "gebiete": [{"id": "x", "enabled": True, "plz_prefixes": ["48", "4a"],
+                         "trigger_overrides": {}}],
+        }
+        self.assertTrue(any("reine Ziffern" in e for e in cs._validate(raw)))
+        raw["gebiete"][0]["plz_prefixes"] = ["48", "59"]      # reine Ziffern -> kein solcher Fehler
+        self.assertFalse(any("reine Ziffern" in e for e in cs._validate(raw)))
+
+
 class TestEffectiveTrigger(unittest.TestCase):
     def setUp(self):
         self.store = cs.load(Path("/nonexistent/config_store.json"))  # Defaults

@@ -43,6 +43,16 @@ def _slug(s: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", s).strip("-") or "region"
 
 
+def _plz_prefixes(roh: str) -> tuple[str, ...]:
+    """Ad-hoc ``--plz`` parsen UND die Ziffern-Invariante erzwingen. Damit ist der escapefreie SQL-
+    LIKE-Filter sicher (PLZ-Präfix kann kein %/_ enthalten) — die Gegen-Stelle ist config_store._validate."""
+    prefixes = tuple(p.strip() for p in roh.split(",") if p.strip())
+    bad = [p for p in prefixes if not p.isdigit()]
+    if bad:
+        raise SystemExit(f"--plz: PLZ-Präfixe müssen reine Ziffern sein, ungültig: {bad}")
+    return prefixes
+
+
 def _write_csv(path: Path, leads: list[dict]) -> None:
     fields = [k for k in leads[0] if k != "flags"] + ["flags"]
     with open(path, "w", newline="", encoding="utf-8") as f:
@@ -96,7 +106,7 @@ def cmd_build_db(args: argparse.Namespace) -> int:
 def cmd_leads(args: argparse.Namespace) -> int:
     con = dbmod.connect(args.db)
     index = build_storage_index(con)
-    prefixes = tuple(p.strip() for p in args.plz.split(",") if p.strip()) if args.plz else ()
+    prefixes = _plz_prefixes(args.plz) if args.plz else ()
     leads = list(
         iter_leads(con, index, plz_prefixes=prefixes, bundesland=args.bundesland, limit=args.limit)
     )
@@ -131,7 +141,7 @@ def cmd_leads(args: argparse.Namespace) -> int:
 def _resolve_targets(store, args) -> list[tuple[str, str, tuple[str, ...]]]:
     """(gebiet_id, name, plz_prefixes) aus --plz (ad-hoc), --gebiet oder allen aktiven Gebieten."""
     if args.plz:
-        prefixes = tuple(p.strip() for p in args.plz.split(",") if p.strip())
+        prefixes = _plz_prefixes(args.plz)
         return [("adhoc", args.region_name or ("PLZ " + "/".join(prefixes)), prefixes)]
     if args.gebiet:
         g = store.gebiet(args.gebiet)
@@ -243,6 +253,40 @@ def cmd_qa(args: argparse.Namespace) -> int:
             url = mastr_detail_url(detail_id) if detail_id else mastr_suchlink(see)
             print(f"  {see:16s} {r['status']:9s} ABR={r['betreiber_mastr_nr'] or '—':16s} "
                   f"flags={r['flags_at_review'] or ''}  {url}")
+    elif args.action == "suggest":
+        # Vor-dem-Essen-Helfer: Pending nach Flag-Muster GRUPPIEREN + je Fall einen Approve/Reject-
+        # VORSCHLAG + Copy-Paste-Kommando ausgeben. NICHTS wird automatisch entschieden — der Mensch
+        # setzt 'qa approve/reject/approve-abr' bewusst ab. Links wie 'qa list' (Default Cache, --online live).
+        rows = qa_gate.list_queue(con, status=qa_gate.PENDING, limit=args.limit)
+        hist = Counter(r["flags_at_review"] or "(kein flag)" for r in rows)
+        print(f"QA-Vorschlag (pending): {len(rows)} Fälle · NICHTS wird automatisch entschieden.")
+        for muster, n in hist.most_common():
+            empf, _ = qa_gate.suggest_for_flags(None if muster == "(kein flag)" else muster)
+            print(f"  {n:4d}×  {muster:42s} -> {empf}")
+        resolver = mastr_resolve.EvidenzResolver(cache_con=con) if args.online else None
+        aktuelles_muster = object()
+        for r in sorted(rows, key=lambda r: (r["flags_at_review"] or "", r["einheit_mastr_nr"])):
+            muster = r["flags_at_review"] or "(kein flag)"
+            empf, grund = qa_gate.suggest_for_flags(r["flags_at_review"])
+            if muster != aktuelles_muster:
+                print(f"\n=== {muster}  [{empf}] ===")
+                aktuelles_muster = muster
+            see = r["einheit_mastr_nr"]
+            if resolver is not None:
+                detail_id = resolver.resolve_id(see)
+            else:
+                hit = con.execute("SELECT detail_id FROM mastr_url_cache WHERE einheit_mastr_nr = ?",
+                                  (see,)).fetchone()
+                detail_id = hit[0] if hit else None
+            url = mastr_detail_url(detail_id) if detail_id else mastr_suchlink(see)
+            if empf == qa_gate.REC_REJECT:
+                cmd = f"qa reject {see} --grund {grund}"
+            elif empf == qa_gate.REC_APPROVE:
+                cmd = f"qa approve {see}"
+            else:
+                cmd = f"# {see} prüfen, dann qa approve/reject"
+            print(f"  {see:16s} ABR={r['betreiber_mastr_nr'] or '—':16s} {empf:16s} {url}")
+            print(f"      -> {cmd}")
     elif args.action == "approve":
         n = qa_gate.approve(con, args.einheit, grund=args.grund, notiz=args.notiz)
         print(f"approved: {n} Einheit(en).")
@@ -348,7 +392,7 @@ def cmd_evidenz_check(args: argparse.Namespace) -> int:
     """Stichproben-Check der Evidenz-URLs auf Erreichbarkeit (HTTP 200) — TEIL-5-Validierung."""
     store = cs.load()
     if args.plz:
-        prefixes = tuple(p.strip() for p in args.plz.split(",") if p.strip())
+        prefixes = _plz_prefixes(args.plz)
     elif args.gebiet and store.gebiet(args.gebiet):
         prefixes = tuple(store.gebiet(args.gebiet).get("plz_prefixes", ()))
     else:
@@ -561,7 +605,7 @@ def main(argv: list[str] | None = None) -> int:
     sgd.set_defaults(func=cmd_gate_demo)
 
     sq = sub.add_parser("qa", help="Mensch-QA-Gate (D5): Queue / approve / reject / approve-abr")
-    sq.add_argument("action", choices=["list", "approve", "reject", "approve-abr"])
+    sq.add_argument("action", choices=["list", "suggest", "approve", "reject", "approve-abr"])
     sq.add_argument("einheit", nargs="?", default="", help="EinheitMastrNummer (bzw. ABR bei approve-abr)")
     sq.add_argument("--grund", default="")
     sq.add_argument("--notiz", default="")

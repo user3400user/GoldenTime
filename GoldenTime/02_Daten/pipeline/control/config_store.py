@@ -141,6 +141,10 @@ def _validate(raw: dict) -> list[str]:
             pp = g.get("plz_prefixes")
             if not isinstance(pp, list) or not all(isinstance(p, str) and p for p in pp):
                 errors.append(f"gebiet '{gid}': 'plz_prefixes' muss nichtleere Strings sein")
+            elif not all(p.isdigit() for p in pp):
+                # PLZ-Präfixe = reine Ziffern. Diese EINE Invariante macht den SQL-LIKE-Region-Filter
+                # ohne Escaping sicher (kein %/_ in einer Ziffern-PLZ möglich).
+                errors.append(f"gebiet '{gid}': 'plz_prefixes' muss reine Ziffern sein (PLZ)")
             ov = g.get("trigger_overrides", {})
             if not isinstance(ov, dict):
                 errors.append(f"gebiet '{gid}': 'trigger_overrides' muss ein Objekt sein")

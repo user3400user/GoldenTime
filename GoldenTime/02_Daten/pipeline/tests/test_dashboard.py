@@ -106,6 +106,16 @@ class TestRenderDashboard(unittest.TestCase):
         html = views.render_dashboard(DEFAULT_STORE, [], [])
         self.assertIn("aktive Trigger", html)
 
+    def test_aktueller_stand_block_latest_by_dimension(self):
+        # C2: latest_by_dimension verdrahtet als 'Aktueller Stand'-Block (additiver 5. Param).
+        latest = [{"gebiet": "muensterland", "trigger": "T2", "metrik": "lieferbar",
+                   "summe": 41.0, "woche": "2026-W25"}]
+        html = views.render_dashboard(DEFAULT_STORE, [], [], None, latest)
+        self.assertIn("Aktueller Stand je Dimension", html)
+        self.assertIn("41", html)
+        # Backward-Compat: 3-arg-Aufruf bleibt gültig, Block zeigt Platzhalter
+        self.assertIn("Aktueller Stand je Dimension", views.render_dashboard(DEFAULT_STORE, [], []))
+
 
 class TestMetricsRoundtrip(unittest.TestCase):
     def setUp(self):

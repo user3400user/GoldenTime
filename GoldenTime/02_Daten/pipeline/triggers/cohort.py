@@ -145,6 +145,8 @@ def cohort_signals(
             raise LookupError(
                 f"PLZ-Filter verlangt, aber Solar-Tabelle '{solar}' ohne Postleitzahl-Spalte."
             )
+        # PLZ-Präfixe sind ziffern-gegated (config_store._validate + cli._plz_prefixes) -> LIKE 'präfix%'
+        # braucht KEIN Escape (kein %/_ in einer Ziffern-PLZ möglich). Bewusst kein re.escape.
         where.append("(" + " OR ".join(f's."{s_map["plz"]}" LIKE ?' for _ in plz_prefixes) + ")")
         params.extend(f"{p}%" for p in plz_prefixes)
     if s_map.get("betriebsstatus"):

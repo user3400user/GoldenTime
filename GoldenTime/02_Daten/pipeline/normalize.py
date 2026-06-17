@@ -139,6 +139,8 @@ def iter_leads(
     if plz_prefixes:
         if not cmap.get("plz"):
             raise LookupError(f"PLZ-Filter verlangt, aber Solar-Tabelle '{table}' ohne Postleitzahl-Spalte.")
+        # PLZ-Präfixe sind ziffern-gegated (config_store._validate + cli._plz_prefixes) -> LIKE 'präfix%'
+        # braucht KEIN Escape (kein %/_ in einer Ziffern-PLZ möglich). Bewusst kein re.escape.
         where.append("(" + " OR ".join(f'"{cmap["plz"]}" LIKE ?' for _ in plz_prefixes) + ")")
         params.extend(f"{p}%" for p in plz_prefixes)
     if bundesland and cmap.get("bundesland"):

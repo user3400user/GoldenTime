@@ -234,11 +234,35 @@ def _qa_queue_tabelle(qa_rows: list) -> str:
     )
 
 
+def _aktueller_stand_tabelle(latest_rows: list) -> str:
+    """Kompakt-Sicht 'aktueller Stand je Dimension' (jüngste Woche je gebiet×trigger×metrik).
+
+    Aus ``metrics.latest_by_dimension`` — ergänzt das (historische) Monitoring um den reinen
+    Ist-Stand. Bei nur 1 erfasster Woche deckungsgleich; ab dem 2. Wochenlauf der nützliche Teil.
+    """
+    if not latest_rows:
+        body = '<tr><td colspan="5" class="muted">Noch keine Metriken erfasst.</td></tr>'
+    else:
+        body = "".join(
+            f"<tr><td>{_esc(r.get('gebiet') or '—')}</td><td>{_esc(r.get('trigger') or '—')}</td>"
+            f"<td>{_esc(r.get('metrik'))}</td><td>{_esc(_num(r.get('summe')))}</td>"
+            f"<td class=\"muted\">{_esc(r.get('woche'))}</td></tr>"
+            for r in latest_rows
+        )
+    return (
+        "<h2>Aktueller Stand je Dimension</h2>"
+        "<table><thead><tr><th>Gebiet</th><th>Trigger</th><th>Metrik</th>"
+        "<th>Wert</th><th>Woche</th></tr></thead>"
+        f"<tbody>{body}</tbody></table>"
+    )
+
+
 def render_dashboard(
     store: ConfigStore,
     metrics_rows: list[dict],
     ledger_rows: list[dict],
     qa_rows: list | None = None,
+    latest_rows: list | None = None,
 ) -> str:
     """Vollständige Dashboard-Seite als HTML-String (reine Funktion, testbar ohne Server).
 
@@ -262,6 +286,7 @@ def render_dashboard(
         + _modul_tabelle(store)
         + _gebiete_tabelle(store)
         + _monitoring_tabelle(metrics_rows)
+        + _aktueller_stand_tabelle(latest_rows or [])
         + _qa_queue_tabelle(qa_rows or [])
         + _exklusivitaet_tabelle(ledger_rows)
         + fuss

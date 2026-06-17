@@ -265,5 +265,31 @@ class TestQaGateStoredDecision(unittest.TestCase):
             con.close()
 
 
+class TestQaSuggest(unittest.TestCase):
+    """A: reine 'qa suggest'-Vorschlagslogik — deterministisch, NIE ein Auto-Approve."""
+
+    def test_reject_flags(self):
+        for flag in ("VEREIN_PRUEFEN", "OEFFENTLICH_PRUEFEN", "ENERGIE_FIRMA_PRUEFEN",
+                     "IMMOBILIEN_PRUEFEN", "KETTE_PRUEFEN"):
+            empf, grund = qa_gate.suggest_for_flags(flag)
+            self.assertEqual(empf, qa_gate.REC_REJECT, flag)
+            self.assertTrue(grund)
+
+    def test_person_pruefen_und_premium_approve(self):
+        self.assertEqual(qa_gate.suggest_for_flags("NATUERLICHE_PERSON_PRUEFEN")[0], qa_gate.REC_PRUEFEN)
+        self.assertEqual(qa_gate.suggest_for_flags("PREMIUM_SPEICHER_ANDERER_STANDORT")[0], qa_gate.REC_APPROVE)
+
+    def test_reject_ueberstimmt_premium_in_kombi(self):
+        # e.V. + Premium-Speicher -> der Reject-Flag MUSS gewinnen (kein Durchrutschen).
+        empf, grund = qa_gate.suggest_for_flags("VEREIN_PRUEFEN|PREMIUM_SPEICHER_ANDERER_STANDORT")
+        self.assertEqual(empf, qa_gate.REC_REJECT)
+        self.assertIn("verein", grund)
+
+    def test_leer_oder_unbekannt_ist_pruefen_nie_approve(self):
+        self.assertEqual(qa_gate.suggest_for_flags(None)[0], qa_gate.REC_PRUEFEN)
+        self.assertEqual(qa_gate.suggest_for_flags("")[0], qa_gate.REC_PRUEFEN)
+        self.assertEqual(qa_gate.suggest_for_flags("WAS_UNBEKANNTES")[0], qa_gate.REC_PRUEFEN)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

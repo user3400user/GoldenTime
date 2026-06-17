@@ -44,6 +44,48 @@ PENDING = "pending"
 APPROVED = "approved"
 REJECTED = "rejected"
 
+# --- Vorschlags-Schicht (read-only, für 'qa suggest') -------------------------------------------
+# NUR ein Vorschlag für den Menschen — NICHTS hier entscheidet automatisch. apply_qa/approve/reject
+# bleiben die einzigen Schreibpfade. Default-Empfehlung je Flag; bei Flag-Kombination gewinnt die
+# RESTRIKTIVSTE (ein Reject-Flag darf NICHT von einem Premium-Approve überstimmt werden — sonst
+# rutscht ein geflaggter e.V. mit Premium-Speicher durch).
+REC_REJECT = "reject (prüfen)"
+REC_PRUEFEN = "prüfen"
+REC_APPROVE = "approve (Premium)"
+
+FLAG_EMPFEHLUNG: dict[str, tuple[str, str]] = {
+    "VEREIN_PRUEFEN": (REC_REJECT, "verein"),
+    "OEFFENTLICH_PRUEFEN": (REC_REJECT, "oeffentlich"),
+    "ENERGIE_FIRMA_PRUEFEN": (REC_REJECT, "energie_firma"),
+    "IMMOBILIEN_PRUEFEN": (REC_REJECT, "immobilien"),
+    "KETTE_PRUEFEN": (REC_REJECT, "kette"),
+    "NATUERLICHE_PERSON_PRUEFEN": (REC_PRUEFEN, "natuerliche_person"),
+    "PREMIUM_SPEICHER_ANDERER_STANDORT": (REC_APPROVE, "premium_speicher"),
+}
+_REC_RANG = {REC_REJECT: 0, REC_PRUEFEN: 1, REC_APPROVE: 2}
+
+
+def parse_flags(flags_at_review: str | None) -> tuple[str, ...]:
+    """'|'-jointe ``flags_at_review``-Spalte -> Flag-Tupel. Leer/None -> ()."""
+    if not flags_at_review:
+        return ()
+    return tuple(f for f in flags_at_review.split("|") if f)
+
+
+def suggest_for_flags(flags_at_review: str | None) -> tuple[str, str]:
+    """Reiner Approve/Reject-VORSCHLAG für ein Flag-Muster -> (empfehlung, grund).
+
+    Deterministisch, ohne DB/IO -> direkt testbar. Bei mehreren Flags gewinnt die restriktivste
+    Empfehlung (Reject vor Prüfen vor Premium-Approve). Unbekannt/leer -> 'prüfen', NIE ein
+    Auto-Approve. ``grund`` ist als CLI-Audit-Grund (``qa reject --grund``) verwendbar.
+    """
+    treffer = [FLAG_EMPFEHLUNG[f] for f in parse_flags(flags_at_review) if f in FLAG_EMPFEHLUNG]
+    if not treffer:
+        return (REC_PRUEFEN, "unklar")
+    empf = min(treffer, key=lambda t: _REC_RANG[t[0]])[0]
+    grund = "+".join(g for e, g in treffer if e == empf)
+    return (empf, grund)
+
 
 def _kwp_band(kwp: float | None) -> str:
     """kWp-Band relativ zur Produkt-Spanne: 'in' (KWP_MIN..KWP_MAX) sonst 'out'.
