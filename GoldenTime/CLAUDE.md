@@ -95,7 +95,7 @@ aus dem Quellcode vermuteten deutschen XSD-Namen waren over-thought — `inspect
 - `02_Daten/pipeline/` — **PULL steht** (Export-Adapter + ABR-Speicher-Anywhere + Normalisierung + CLI).
   **Neu (Session 1):** `signal/` (K5 SignalRecord + from_lead, Konfidenz=Pflicht) · `control/` (D3 config_store
   + D1/D5/D6 `pipeline_state.db`, WAL) · `config_store.json` (versioniert). **36 Tests grün** (stdlib).
-  **Gebaut + integriert + ZWEIT-REVIEW-gehärtet, 188 Tests grün:** register(D4) · snapshot+diff(K2) ·
+  **Gebaut + integriert + ZWEIT-REVIEW-gehärtet, 191 Tests grün:** register(D4) · snapshot+diff(K2) ·
   triggers cohort/diff_based(K3) · qualify+QA(K4/D5) · ledger(K6) · enrich(K7) + evidenz-resolver ·
   dashboard(K8) · deliver(TEIL 5). CLI: `signals`/`qa`/`snapshot`/`diff`/`ledger`/`dashboard`/`liefern`/
   `mengen`/`evidenz-check`/**`weekly`**/**`gate-demo`**. Eigene `pipeline/README.md`.
@@ -148,7 +148,7 @@ aus dem Quellcode vermuteten deutschen XSD-Namen waren over-thought — `inspect
   - **R3c Dashboard-Politur (85aa73e):** Monitoring jetzt Trichter je Gebiet×Trigger (Metriken als Spalten)
     + Ausbeute % + Frische; Gebiete-Block zeigt `effective_trigger`. (Nicht umgesetzt: `latest_by_dimension`
     = redundant; Liefer-Protokoll-Ansicht = `record_delivery` ungenutzt → leer.)
-- **Autonomer R4-Loop (16.06., finale Review-Workflow + Direkt-Fixes, 188 Tests grün, Commit `eb316b7`):**
+- **Autonomer R4-Loop (16.06., finale Review-Workflow + Direkt-Fixes, 191 Tests grün, Commit `eb316b7`):**
   5-Dim-Review (5 Skeptiker-verifiziert) fand 7 Rest-Defekte → behoben:
   - **[HIGH, business-shifting] Rechtsform-Katalog-Drift:** echter Wert `'Stiftung  des öffentlichen Rechts'`
     hat ZWEI Leerzeichen → Key matchte nie; `_rechtsform_flag` kollabiert jetzt Whitespace + normalisiert
@@ -161,6 +161,19 @@ aus dem Quellcode vermuteten deutschen XSD-Namen waren over-thought — `inspect
   - **DEFERRED (dokumentiert, vetobar):** `record_delivery`/`reserve`-Verdrahtung (business-shifting, Demo-vs-Real-
     Design nötig — Top-Post-Essen-Item: ohne sie sind Dashboard-Exklusivität + Dedupe-Versprechen leer) ·
     FLUSS T1/T4 erst nach 2. Snapshot (zeitlich) · CSV-Konfidenz-Inline-Disclaimer (durch `konfidenz_gruende` gemildert).
+- **R6 Bug+Optimierungs-Jagd (16.06., Workflow 6 Finder × Skeptiker, 191 Tests grün, Commit `28a9fcd`):**
+  6 Bugs + 5 Opt gefunden (weniger-reviewte Winkel), die wirkungsvollen behoben:
+  - **[HIGH] `write_snapshot` jetzt ATOMAR** (temp + `os.replace`): ein Teil-Abbruch (I/O/OOM/Sleep/Ctrl-C)
+    zerstörte vorher via `unlink`+In-Place die Diff-Baseline → Diff gegen leeren Snapshot. + streamt jetzt
+    (Generator statt 6,2-Mio-Zeilen-Liste, ~2,5 GB Peak weg → senkt das OOM-Risiko, das den Bug auslöste).
+  - **[HIGH] QA-Gate honoriert gespeicherten Entscheid** (D5): ein abgelehnter Lead wurde wieder ausgeliefert,
+    sobald sein Flag im Folgelauf nicht mehr feuerte (Join-Ausfall/Heuristik-Edit). `apply_qa` liest jetzt
+    `qa_decision` VOR dem auto_ok-Shortcut.
+  - **[OPT, real verifiziert] `build_storage_index`: 5 Scans → 1** über storage_extended (2,58 Mio):
+    **16 s → 3,0 s (~5×), Counts identisch** — spart ~13 s je Wochen-/Demo-Lauf.
+  - **[LOW/MED] `_in_betrieb`-toter-Vergleich gefixt; Metrik-Clobber** (cmd_signals post-Ledger vs run_region
+    pre-Ledger) → beide schreiben jetzt die rohe Dichte. **DEFERRED:** LIKE-Escape im PLZ-Filter (PLZ=Ziffern,
+    0 reale Wirkung); cohort-Single-Scan über mehrere Gebiete (risk=medium, invasiv).
 - `02_Daten/.venv/` — lokales venv (gitignored), **open-mastr 0.17.1** + Deps installiert
   (System-`python3` hat kein pip → via `get-pip.py` gebootstrappt, kein sudo).
 - **Phase 0 ABGESCHLOSSEN (16.06.):** `build-db` echter Lauf ✅ (Export-DB 8,6 GB, Download 1575 s), `inspect` ✅,
@@ -184,7 +197,7 @@ cd 02_Daten
 .venv/bin/python -m pipeline.cli build-db                       # Export laden (~3 GB; läuft auf ZBook)
 .venv/bin/python -m pipeline.cli inspect                        # Schema gegen config.py prüfen
 .venv/bin/python -m pipeline.cli leads --plz 48,59              # Region → klassifizierte Leads (CSV)
-.venv/bin/python -m unittest discover -s pipeline/tests -p "test_*.py"   # volle Suite (188 Tests)
+.venv/bin/python -m unittest discover -s pipeline/tests -p "test_*.py"   # volle Suite (191 Tests)
 .venv/bin/python -m pipeline.cli signals --gebiet muensterland # T2-Signal-Shipper (cohort+qualify+QA → SignalRecord-CSV)
 .venv/bin/python -m pipeline.cli qa list                       # QA-Queue ansehen (approve/reject/approve-abr)
 .venv/bin/python -m pipeline.cli snapshot                      # schlanker Wochen-Snapshot (D2)
