@@ -141,3 +141,15 @@ Geprüfte Alternativen für die erste Bau-Schleife:
 - **Re-Score (Beleg):** Dim 9 **Betriebsreife/Datenverlust 2→3** (Backup + getesteter Restore des nicht-regenerierbaren Ledgers; Zielbild-Kern „getesteter Restore" erfüllt). Cron-Tagesbackup (G32-Ops) + voller CI/IaC bleiben M2.
 
 **Status Loop 2: ✅ ABGESCHLOSSEN.**
+
+---
+
+## Loop 3 · Kundenportal mit Login/Auth (DoD §9.4) — ABGESCHLOSSEN (18.06.)
+**Ziel-Ableitung (§1.1):** Gründer-Direktive: Meilenstein erst „fertig", wenn alles davor top-tier ist (DoD §9, nicht Loop-Bookkeeping). Größter verbleibender §9-Hebel = **„Portal (mit Auth) läuft demonstrierbar auf Sample-Daten" (§9.4)** — das „verkaufbare Asset" + die niedrigste In-Scope-Dimension **UX (2)** (Zielbild 4,5: „sauberes, vertrauenswürdiges Kundenportal, Provenance 1-Klick"). Käufer-Frage „Was sehe ich als Kunde?" wird erst hier beantwortet. Baubar JETZT (Sample-Daten, LIVE aus) — nicht extern/human-gated.
+- **Abweichung (§6.3, begründet):** **stdlib `http.server`** statt FastAPI+HTMX+Tailwind+Playwright (Backlog-Vorschlag). Gründe: architektur-konsistent („stdlib-first", wie das Admin-Dashboard); **voll in-process testbar** (Playwright-Browser-Download blockt hier wie der MaStR-Download → nicht verifizierbar = nicht „abgeschlossen aus meiner Sicht"); Zielbild UX 4,5 (nicht Consumer-Design-System). Invarianten unberührt.
+- **Gebaut:** `pipeline/portal/` — `auth.py` (scrypt-Passwörter + Salt, Sessions als sha256(Token) in DB, Mandanten-Filter), `views.py` (sauberes HTML, alles escaped, Provenance 1-Klick + dl-de-Footer + Demo-Banner), `app.py` (HTTP-Hülle, HttpOnly+SameSite=Strict-Cookies, CSRF-Logout), `seed.py` (synthetische Demo-Leads, §0-bulletproof). Schema: `customer`/`portal_session`/`portal_lead`. CLI: `portal serve/seed-demo/add-customer`.
+- **Refute = Security-Engineer-Review** (adversarial): **kein CRITICAL** (kein SQLi/IDOR/XSS/§0-Leck; Mandanten-Trennung serverseitig, cross-Mandant = 404). 1 HIGH (Session-Fixation-Restrisiko) + MEDIUMs **gefixt**: H1 Single-Active-Session (Re-Login invalidiert alte Tokens) · M1 `Secure`-Cookie (ENV-gated) · M2 Body-Limit (413) · **§0-Härtung: `nur_demo`-Filter serverseitig** (Demo-Modus zeigt NIE `demo=0`-Echtdaten — §0 im Lese-Pfad verriegelt, nicht nur per Schreib-Disziplin). M3 (Rate-Limit) als pre-Internet-Item dokumentiert vertagt.
+- **Verifikation:** **366 Tests grün (+17 Portal: Auth, Mandanten-Trennung, voller HTTP-Flow inkl. cross-Mandant-404, CSRF-Logout, Session-Expiry, §0-Filter, Body-413).** End-to-End-Live-Server-Smoke (CLI seed/add-customer + curl Login→Cookie→eigene Leads→Demo-Banner→Auth-Pflicht).
+- **Re-Score (Beleg):** **UX 2→4** (sauberes, sicheres Kundenportal mit Login + Mandanten-Trennung + Provenance 1-Klick + Demo-Banner — trifft die Zielbild-Merkmale; nur der volle Cockpit-Ausbau fehlt zu 4,5). Funktionsumfang eff.3→3,5 (verkaufbares Asset DoD §9.4). Infra-Sicherheit gehärtet (Auth/Session, security-reviewed). **DoD §9.4 erfüllt.**
+
+**Status Loop 3: ✅ ABGESCHLOSSEN.**

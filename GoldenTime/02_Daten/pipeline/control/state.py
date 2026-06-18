@@ -79,6 +79,46 @@ CREATE TABLE IF NOT EXISTS mastr_url_cache (
   detail_id        INTEGER,
   resolved_at      TEXT
 );
+
+-- Kundenportal (Loop 3) — Auth + Mandanten. Ein Kunde ist genau EINEM Gebiet × Funktion zugeordnet
+-- (Exklusivität); er sieht NUR die Leads seines Gebiets (Mandanten-Trennung). Passwort = scrypt-Hash
+-- + per-User-Salt (nie Klartext). Sessions als sha256(Token) gespeichert (DB-Leck enthüllt keine
+-- Live-Tokens). Bewusst getrennt vom Admin-Config (Kunde steuert NICHTS, liest nur seine Lieferung).
+CREATE TABLE IF NOT EXISTS customer (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  login       TEXT NOT NULL UNIQUE,
+  name        TEXT,
+  pass_hash   TEXT NOT NULL,
+  pass_salt   TEXT NOT NULL,
+  gebiet      TEXT NOT NULL,
+  funktion    TEXT NOT NULL DEFAULT 'speicher_installateur',
+  aktiv       INTEGER NOT NULL DEFAULT 1,
+  erstellt_am TEXT
+);
+CREATE TABLE IF NOT EXISTS portal_session (
+  token_hash  TEXT PRIMARY KEY,         -- sha256(raw-token); der Roh-Token lebt nur im Cookie
+  customer_id INTEGER NOT NULL,
+  csrf        TEXT NOT NULL,            -- per-Session CSRF-Token für state-ändernde POSTs
+  erstellt_am TEXT,
+  laeuft_ab   TEXT NOT NULL            -- ISO-Zeitstempel; abgelaufene Sessions sind ungültig
+);
+CREATE INDEX IF NOT EXISTS ix_portal_session_cust ON portal_session (customer_id);
+-- Pro Kunde sichtbare Liefer-Leads (Mandanten-Sicht). 'demo'=1 = Sample-/e.K.-gefiltert (kein echter
+-- Personendaten-Pfad an einen zahlenden Kunden, §0/I8). Befüllt via CLI (portal seed-demo / publish).
+CREATE TABLE IF NOT EXISTS portal_lead (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  gebiet      TEXT NOT NULL,
+  see         TEXT NOT NULL,
+  entity      TEXT,
+  kwp         REAL,
+  plz         TEXT,
+  ort         TEXT,
+  trigger     TEXT,
+  datum       TEXT,
+  evidenz_url TEXT,
+  demo        INTEGER NOT NULL DEFAULT 1
+);
+CREATE INDEX IF NOT EXISTS ix_portal_lead_gebiet ON portal_lead (gebiet);
 """
 
 

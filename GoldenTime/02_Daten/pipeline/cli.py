@@ -15,6 +15,8 @@ import csv
 import datetime as dt
 import logging
 import re
+import secrets
+import sqlite3
 import sys
 from collections import Counter
 from pathlib import Path
@@ -667,6 +669,37 @@ def cmd_restore(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_portal(args: argparse.Namespace) -> int:
+    """Kundenportal (DoD §9.4): serve / seed-demo / add-customer. Läuft auf Sample-Daten; LIVE aus → Demo."""
+    from .portal import app as portalapp, auth as pauth, seed as pseed
+    if args.action == "serve":
+        if config.LIVE_DELIVERY_ENABLED:
+            print("HINWEIS: LIVE_DELIVERY_ENABLED ist AN — das Portal zeigt KEINE Demo-Kennzeichnung mehr.")
+        print(f"Kundenportal: http://127.0.0.1:{args.port}/  (Strg+C zum Beenden)")
+        portalapp.serve(port=args.port)
+        return 0
+    con = statemod.connect()
+    try:
+        if args.action == "seed-demo":
+            n = pseed.seed_demo_leads(con)
+            print(f"Demo-Leads gesetzt: {n} (synthetisch, §0-sicher).")
+        elif args.action == "add-customer":
+            if not (args.login and args.gebiet):
+                raise SystemExit("add-customer verlangt --login und --gebiet.")
+            pw = args.password or secrets.token_urlsafe(9)
+            try:
+                cid = pauth.create_customer(con, login=args.login, password=pw, name=args.name or args.login,
+                                            gebiet=args.gebiet, funktion=args.funktion or "speicher_installateur")
+            except sqlite3.IntegrityError:
+                raise SystemExit(f"Login '{args.login}' existiert bereits.")
+            print(f"Kunde #{cid} angelegt: login={args.login.strip().lower()} · gebiet={args.gebiet}")
+            if not args.password:
+                print(f"  generiertes Passwort: {pw}   (JETZT notieren — wird nicht erneut angezeigt)")
+    finally:
+        con.close()
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     p = argparse.ArgumentParser(prog="pipeline", description="MaStR-Lead-Pipeline (B-Backbone)")
@@ -776,6 +809,16 @@ def main(argv: list[str] | None = None) -> int:
     srs = sub.add_parser("restore", help="pipeline_state.db aus einem Backup wiederherstellen (Default: neuestes)")
     srs.add_argument("--from", dest="from_backup", default="", help="Backup-Pfad (Default: neuestes in backups/)")
     srs.set_defaults(func=cmd_restore)
+
+    spo = sub.add_parser("portal", help="Kundenportal (Login/Auth, Mandanten-Sicht) — Sample-Daten, DoD §9.4")
+    spo.add_argument("action", choices=["serve", "seed-demo", "add-customer"])
+    spo.add_argument("--port", type=int, default=8770)
+    spo.add_argument("--login", default="", help="add-customer: Login (E-Mail/Benutzername)")
+    spo.add_argument("--name", default="", help="add-customer: Anzeigename")
+    spo.add_argument("--gebiet", default="", help="add-customer: zugeordnetes Gebiet (Mandant)")
+    spo.add_argument("--funktion", default="", help="add-customer: Funktion (Default speicher_installateur)")
+    spo.add_argument("--password", default="", help="add-customer: Passwort (leer = generiert + angezeigt)")
+    spo.set_defaults(func=cmd_portal)
 
     args = p.parse_args(argv)
     return args.func(args)
