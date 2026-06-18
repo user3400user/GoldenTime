@@ -131,3 +131,13 @@ Geprüfte Alternativen für die erste Bau-Schleife:
 - **Vertagt:** Frische sichtbar (Säule 3) — T2-irrelevant, mit Säule 1/T1 vertagt. Volle Trailing-Baseline-Anomalie + per-Trigger-Diff-Metriken → M2 (brauchen FLUSS + Historie).
 
 **Status Loop 1: ✅ ABGESCHLOSSEN.** Verbleibende M1-Gate-Code-Items: keine (USP ✓, Backup ✓, Mengen ✓, G5 ✓, G17 ✓); **kritischer M1-Pfad = nur noch Anwalt (PT1, Mensch) + Mensch-QA-Durchlauf**.
+
+---
+
+## Loop 2 · Getesteter Restore (DoD §9.5, Zielbild Datenverlust-Achse 5,0) — ABGESCHLOSSEN (18.06.)
+**Ziel-Ableitung:** M1-Code ist fertig → der Loop zielt auf die DoD §9. §9.5 verlangt **„getesteter Restore"**; das Zielbild rät die Datenverlust-Achse auf **5,0** (existenziell — QA-/Exklusiv-/Liefer-Ledger nicht regenerierbar, Verlust zerstört das Exklusivitäts-Versprechen). Trifft die niedrigste Deploy-Dimension (2). **Challenge:** Portal/Auth = größerer Asset-Hebel (DoD §9.4), aber Multi-Session-Frontend → besser frisch; CI = M2; T1/T4 extern blockiert → Restore ist der bounded, completable, existenzielle Hebel jetzt.
+- **Gebaut:** `state.restore_state_db` (validiert Backup = lesbare SQLite mit Kern-Tabellen VOR dem Überschreiben → nie kaputte Datei über Live-DB; atomar via `tempfile`+`os.replace`; stale WAL/SHM bereinigt) + `state.list_backups` + CLI `backup`/`restore` (Default neuestes).
+- **Getesteter Restore (Exit):** voller **Backup → Datenverlust → Restore**-Zyklus, Daten intakt (Unit-Test + End-to-End-CLI: delivery 2 / exclusivity 1 nach Löschung + Restore wiederhergestellt). Kaputtes Backup wird abgelehnt, Live-DB bleibt unangetastet. **349 Tests grün (+4).**
+- **Re-Score (Beleg):** Dim 9 **Betriebsreife/Datenverlust 2→3** (Backup + getesteter Restore des nicht-regenerierbaren Ledgers; Zielbild-Kern „getesteter Restore" erfüllt). Cron-Tagesbackup (G32-Ops) + voller CI/IaC bleiben M2.
+
+**Status Loop 2: ✅ ABGESCHLOSSEN.**

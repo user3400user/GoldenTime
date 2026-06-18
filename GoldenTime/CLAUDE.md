@@ -217,6 +217,11 @@ aus dem Quellcode vermuteten deutschen XSD-Namen waren over-thought — `inspect
   ohne Historie ehrlich None. Re-Score: Observability 2→3. Verbleibende M1-Code-Items: **keine** —
   kritischer M1-Pfad = nur noch Anwalt (PT1) + Mensch-QA. Frische (Säule 3, T2-irrelevant) + volle
   Diff-Anomalie → mit T1/T4 (M2/extern blockiert) vertagt.
+- **LOOP-ENGINEERING Loop 2 „Restore" (18.06., 349 Tests grün):** getesteter Restore (DoD §9.5,
+  Zielbild Datenverlust-Achse 5,0). `state.restore_state_db` (validiert Backup VOR Überschreiben =
+  lesbare SQLite mit Kern-Tabellen; atomar `tempfile`+`os.replace`; stale WAL/SHM bereinigt) +
+  `state.list_backups` + CLI `backup`/`restore`. Voller Backup→Datenverlust→Restore-Zyklus getestet
+  (Unit + End-to-End-CLI). Re-Score: Betriebsreife/Datenverlust 2→3. Cron-Tagesbackup + voller CI = M2.
 - `02_Daten/.venv/` — lokales venv (gitignored), **open-mastr 0.17.1** + Deps installiert
   (System-`python3` hat kein pip → via `get-pip.py` gebootstrappt, kein sudo).
 - **Phase 0 ABGESCHLOSSEN (16.06.):** `build-db` echter Lauf ✅ (Export-DB 8,6 GB, Download 1575 s), `inspect` ✅,

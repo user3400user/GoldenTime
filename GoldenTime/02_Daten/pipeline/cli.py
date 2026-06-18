@@ -637,6 +637,36 @@ def cmd_gate_demo(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_backup(args: argparse.Namespace) -> int:
+    """Sichere die nicht-regenerierbare pipeline_state.db (QA + Exklusiv-/Liefer-Ledger + Metriken)."""
+    p = statemod.backup_state_db()
+    backups = statemod.list_backups()
+    print(f"Backup -> {p}")
+    print(f"Vorhandene Backups: {len(backups)} (neuestes: {backups[0].name if backups else '—'})")
+    return 0
+
+
+def cmd_restore(args: argparse.Namespace) -> int:
+    """Stelle pipeline_state.db aus einem Backup wieder her (Default: neuestes) — validiert + atomar (DoD §9.5)."""
+    if args.from_backup:
+        bp = Path(args.from_backup)
+    else:
+        backups = statemod.list_backups()
+        if not backups:
+            raise SystemExit("Keine Backups in pipeline/backups/ — erst `backup` laufen lassen.")
+        bp = backups[0]
+    dest = statemod.restore_state_db(bp)
+    print(f"Restore: {bp.name} -> {dest}  (validiert, WAL/SHM bereinigt)")
+    con = statemod.connect(dest)
+    try:
+        for t in ("qa_decision", "exclusivity", "delivery"):
+            n = con.execute(f"SELECT count(*) FROM {t}").fetchone()[0]
+            print(f"  {t}: {n} Zeilen wiederhergestellt")
+    finally:
+        con.close()
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     p = argparse.ArgumentParser(prog="pipeline", description="MaStR-Lead-Pipeline (B-Backbone)")
@@ -739,6 +769,13 @@ def main(argv: list[str] | None = None) -> int:
     sh = sub.add_parser("dashboard", help="Admin-Dashboard starten (Steuer-Schicht, localhost)")
     sh.add_argument("--port", type=int, default=8765)
     sh.set_defaults(func=cmd_dashboard)
+
+    sbk = sub.add_parser("backup", help="pipeline_state.db sichern (QA + Ledger + Metriken, nicht regenerierbar)")
+    sbk.set_defaults(func=cmd_backup)
+
+    srs = sub.add_parser("restore", help="pipeline_state.db aus einem Backup wiederherstellen (Default: neuestes)")
+    srs.add_argument("--from", dest="from_backup", default="", help="Backup-Pfad (Default: neuestes in backups/)")
+    srs.set_defaults(func=cmd_restore)
 
     args = p.parse_args(argv)
     return args.func(args)

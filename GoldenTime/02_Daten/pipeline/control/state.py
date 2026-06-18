@@ -14,7 +14,10 @@ from __future__ import annotations
 
 import contextlib
 import datetime as dt
+import os
+import shutil
 import sqlite3
+import tempfile
 from pathlib import Path
 
 from .. import config
@@ -130,6 +133,60 @@ def backup_state_db(db_path: Path | str | None = None,
     finally:
         src.close()
         dst.close()
+    return dest
+
+
+# Kern-Tabellen, deren Vorhandensein ein gültiges State-Backup ausmacht (Restore-Validierung).
+_KERN_TABELLEN = ("qa_decision", "exclusivity", "delivery", "metrics_event")
+
+
+def list_backups(backup_dir: Path | str | None = None) -> list[Path]:
+    """Vorhandene State-Backups, **neueste zuerst** (Dateiname trägt den Timestamp → lexikografisch = chronologisch)."""
+    bdir = Path(backup_dir) if backup_dir else Path(config.PIPELINE_DB_PATH).parent / "backups"
+    if not bdir.exists():
+        return []
+    return sorted(bdir.glob("pipeline_state_*.db"), reverse=True)
+
+
+def _validate_backup(path: Path) -> None:
+    """Wirf, wenn das Backup keine lesbare SQLite mit den Kern-Tabellen ist (vor dem Überschreiben der Live-DB)."""
+    if not path.exists():
+        raise FileNotFoundError(f"Backup nicht gefunden: {path}")
+    con = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+    try:
+        namen = {r[0] for r in con.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+    finally:
+        con.close()
+    fehlt = [t for t in _KERN_TABELLEN if t not in namen]
+    if fehlt:
+        raise ValueError(f"Backup {path} unvollständig — fehlende Kern-Tabellen: {fehlt}")
+
+
+def restore_state_db(backup_path: Path | str,
+                     db_path: Path | str | None = None) -> Path:
+    """Stelle pipeline_state.db aus einem Backup wieder her — **atomar + validiert** (DoD §9.5).
+
+    Schritte: (1) Backup validieren (lesbare SQLite mit den Kern-Tabellen — NIE eine kaputte Datei über
+    die Live-DB legen). (2) Kopie per ``tempfile`` im Zielverzeichnis (gleiches FS) → ``os.replace``
+    (atomar). (3) Stale WAL/SHM-Sidecars der ALTEN DB entfernen (sonst schattet ein alter WAL die
+    restaurierte DB). Recovery-Operation — die DB darf dabei nicht aktiv beschrieben werden.
+    """
+    backup_path = Path(backup_path)
+    _validate_backup(backup_path)
+    dest = Path(db_path or config.PIPELINE_DB_PATH)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=str(dest.parent), prefix=".restore_", suffix=".db")
+    os.close(fd)
+    try:
+        shutil.copyfile(backup_path, tmp)
+        os.replace(tmp, dest)
+    except BaseException:
+        with contextlib.suppress(FileNotFoundError):
+            os.unlink(tmp)
+        raise
+    for sidecar in (dest.with_name(dest.name + "-wal"), dest.with_name(dest.name + "-shm")):
+        with contextlib.suppress(FileNotFoundError):
+            sidecar.unlink()
     return dest
 
 
