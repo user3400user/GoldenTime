@@ -55,6 +55,20 @@ class Buckets:
         return len({r.betreiber_mastr_nr for r in self.lieferbar if r.betreiber_mastr_nr})
 
 
+def _assert_reconciliation(b: Buckets) -> None:
+    """Frozen Invariant I5: die Buckets MÜSSEN exakt auf ``roh`` aufgehen — sonst ist die Klassifikation
+    leck (ein Record verloren oder doppelt) und der Lauf BLOCKIERT, statt still falsche Mengen an einen
+    zahlenden Exklusiv-Kunden zu liefern. Geprüft am konservierten Punkt (nach e.K.-Carve-out, VOR der
+    käufer-spezifischen Ledger-Vorschau, die bewusst schon-gelieferte Einheiten entfernt)."""
+    summe = (len(b.lieferbar) + len(b.nat_person_gesperrt) + len(b.pending)
+             + len(b.namenlos) + len(b.rejected) + len(b.speicher_geplant))
+    if summe != b.roh:
+        raise ValueError(
+            f"Mengen-Reconciliation verletzt (I5): {summe} != roh {b.roh} in '{b.region}' — "
+            "Bucketing-Leck (Record verloren/doppelt); Lauf blockiert statt still falsche Mengen zu liefern."
+        )
+
+
 def run_region(con, qa_con, *, plz_prefixes, region, gebiet_id="", resolve=True, index=None,
                kaeufer="", funktion="", trigger=None, nat_personen_frei=False) -> Buckets:
     """cohort -> qualify -> QA -> e.K.-Hartfilter (§0) -> optionale Ledger-VORSCHAU -> Evidenz.
@@ -93,6 +107,7 @@ def run_region(con, qa_con, *, plz_prefixes, region, gebiet_id="", resolve=True,
     # gemeinsamen Choke-Point. Carve-out => Reconciliation bleibt: lieferbar + nat_gesperrt + pending
     # + namenlos + rejected + geplant = roh.
     b.lieferbar, b.nat_person_gesperrt = hierarchy.partition_natuerliche(b.lieferbar, nat_personen_frei)
+    _assert_reconciliation(b)                  # I5: geht die Menge nicht auf, blockiert der Lauf
     b.lieferbar.sort(key=lambda r: (r.dv_flag, r.kwp or 0), reverse=True)
     # Ledger-VORSCHAU (read-only): gehört Gebiet×Trigger schon einem ANDEREN Käufer -> [] (Exklusivität);
     # schon an diesen Käufer gelieferte Einheiten fallen raus (Dedupe). KEIN Schreibvorgang.

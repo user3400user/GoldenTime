@@ -173,3 +173,11 @@ Geprüfte Alternativen für die erste Bau-Schleife:
 - **Re-Score (Beleg):** **Datenqualität & -integrität 3→4** (Schema-/Katalog-Drift wird vor Auslieferung gefangen + Lauf laut gestoppt — das Zielbild-„nie still absorbiert"; volle Lineage/Reconciliation-Auto-Block zu 5,0 = M2).
 
 **Status Loop 5: ✅ ABGESCHLOSSEN.**
+
+---
+
+## Loop 6 · I5-Erzwingung (Reconciliation blockiert) — ABGESCHLOSSEN (18.06.)
+**Ziel-Ableitung:** Frozen Invariant **I5** sagt „Mengen-Reconciliation geht immer auf — **sonst blockiert der Lauf**", aber der Code *zeigte* sie nur (Mengen-Report), *erzwang* sie nicht. Echter Invarianten-Gap (kein Over-Engineering): ein Bucketing-Leck (Record verloren/doppelt) würde sonst still falsche Mengen an einen Exklusiv-Kunden liefern.
+- **Gebaut:** `deliver._assert_reconciliation` (lieferbar+nat_gesperrt+pending+namenlos+rejected+geplant == roh) in `run_region` am konservierten Punkt (nach e.K.-Carve-out, VOR der käufer-spezifischen Ledger-Vorschau). Verletzung → `ValueError`, Lauf blockiert. 2 Tests (aufgehend ok / Leck blockiert). **373 Tests grün**, Gate grün.
+
+**Status Loop 6: ✅ ABGESCHLOSSEN.** — Damit sind die genuin baubaren, nicht-blockierten, nicht-über-engineerten Hebel ausgeschöpft (s. Closeout-Abschnitt unten).

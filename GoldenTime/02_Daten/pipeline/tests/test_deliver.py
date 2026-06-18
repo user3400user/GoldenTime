@@ -127,5 +127,21 @@ class TestRecordMetrics(unittest.TestCase):
             con.close()
 
 
+class TestReconciliation(unittest.TestCase):
+    """I5 (Frozen Invariant): geht die Menge nicht auf, blockiert der Lauf."""
+
+    def test_aufgehende_menge_ok(self):
+        from pipeline.deliver import _assert_reconciliation
+        b = Buckets("M", roh=3, lieferbar=[_r("S1", "A", "X")],
+                    pending=[_r("S2", "B", "Y")], namenlos=[_r("S3", "C", None)])
+        _assert_reconciliation(b)        # 1+0+1+1+0+0 == 3 -> kein Wurf
+
+    def test_leck_blockiert(self):
+        from pipeline.deliver import _assert_reconciliation
+        b = Buckets("M", roh=5, lieferbar=[_r("S1", "A", "X")])   # 1 != 5 -> Leck
+        with self.assertRaises(ValueError):
+            _assert_reconciliation(b)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
