@@ -238,6 +238,12 @@ aus dem Quellcode vermuteten deutschen XSD-Namen waren over-thought — `inspect
   `.github/workflows/ci.yml` (ruff→mypy→Tests→Coverage `--fail-under=70`, ohne open-mastr da
   stdlib-Tests). 366 Tests grün, Coverage 79 %. Re-Score: Wartbarkeit 3→4. **Gate lokal:**
   `cd 02_Daten && .venv/bin/ruff check pipeline/ && .venv/bin/mypy pipeline/ && .venv/bin/coverage run -m unittest discover -s pipeline/tests -p "test_*.py"`.
+- **LOOP-ENGINEERING Loop 5 „Datenkontrakt" (18.06., 371 Tests grün, Zielbild Datenqualität 5,0):**
+  `control/contract.py` (`verify_contract`/`assert_contract`/`ContractError`) — Schema-Drift-Gate: prüft
+  Pflicht-Tabellen/-Spalten (solar/market/storage/solar_eeg) + **Katalog-Wert** (`EinheitBetriebsstatus`=
+  Klartext 'In Betrieb') und **stoppt den Lauf laut** bei Drift (fängt den open-mastr-Format-Bruch, statt
+  still 0/falsche Leads zu liefern). Verdrahtet in allen Lead-/Export-Pfaden (CLI-Choke-Point + weekly nach
+  build-db) + CLI `verify-schema`. Echtdaten-verifiziert (kein Falsch-Alarm). Re-Score: Datenqualität 3→4.
 - `02_Daten/.venv/` — lokales venv (gitignored), **open-mastr 0.17.1** + Deps installiert (+ dev: ruff/mypy/coverage)
   (System-`python3` hat kein pip → via `get-pip.py` gebootstrappt, kein sudo).
 - **Phase 0 ABGESCHLOSSEN (16.06.):** `build-db` echter Lauf ✅ (Export-DB 8,6 GB, Download 1575 s), `inspect` ✅,

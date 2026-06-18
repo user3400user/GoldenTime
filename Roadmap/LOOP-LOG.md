@@ -163,3 +163,13 @@ Geprüfte Alternativen für die erste Bau-Schleife:
 - **Re-Score (Beleg):** **Wartbarkeit/Codequalität 3→4** (ruff+mypy-Gate grün + Lockfile + CI; nur volle strict-Typisierung fehlt zu 4,5). Betriebsreife 3→3,5 (CI/Lockfile).
 
 **Status Loop 4: ✅ ABGESCHLOSSEN.**
+
+---
+
+## Loop 5 · Daten-Kontrakt / Schema-Drift-Gate (Zielbild Datenqualität 5,0) — ABGESCHLOSSEN (18.06.)
+**Ziel-Ableitung (§1.1):** Datenqualität ist im Zielbild **5,0 (existenziell, „tragende Wand")** — „stille Schema-/Katalog-Korruption vergiftet das ganze Produkt … Schema-Drift wird gefangen und alarmiert, **nie still absorbiert**." Das ist **kein** Customer-Load-Polish, sondern existenziell — und mitigiert genau das **open-mastr-Format-Bruch-Risiko** (01.10.2025-Guardrail), das schon einmal zuschlug (+ jetzt der blockierte Download zeigt die Fragilität der Quelle). Stärkste verbleibende baubare 5,0-Lücke.
+- **Gebaut:** `control/contract.py` — `verify_contract` prüft Pflicht-Tabellen/-Spalten (load-bearing: Identität/Join/Filter/Trigger/Datum je solar/market/storage/solar_eeg) **+ Katalog-Wert-Kontrakt** (`EinheitBetriebsstatus` muss Klartext 'In Betrieb' tragen — fängt den Code-statt-Klartext-Drift, der still 0 Leads erzeugen würde). `assert_contract` **stoppt den Lauf laut** statt still falsch zu liefern. Verdrahtet in **allen** Lead-/Export-Pfaden (leads/signals/snapshot/diff/gate-demo/liefern/mengen/evidenz-check via gemeinsamen Choke-Point + `weekly` direkt nach build-db) + CLI `verify-schema` (für CI/vor dem Wochenlauf).
+- **Verifikation:** 5 Kontrakt-Tests (gültig→leer · fehlende Tabelle/Spalte · Katalog-Drift · assert wirft). **371 Tests grün.** **Echtdaten:** `verify-schema` auf der 9,3-GB-Export-DB → **OK, kein Falsch-Alarm** (korrekt kalibriert). Gate (ruff+mypy+Coverage) grün.
+- **Re-Score (Beleg):** **Datenqualität & -integrität 3→4** (Schema-/Katalog-Drift wird vor Auslieferung gefangen + Lauf laut gestoppt — das Zielbild-„nie still absorbiert"; volle Lineage/Reconciliation-Auto-Block zu 5,0 = M2).
+
+**Status Loop 5: ✅ ABGESCHLOSSEN.**

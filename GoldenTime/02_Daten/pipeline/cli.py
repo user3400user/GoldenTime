@@ -24,6 +24,7 @@ from pathlib import Path
 from . import config, deliver, export_adapter
 from . import db as dbmod
 from .control import config_store as cs
+from .control import contract
 from .control import metrics as metricsmod
 from .control import state as statemod
 from .enrich import mastr_resolve
@@ -105,6 +106,7 @@ def cmd_build_db(args: argparse.Namespace) -> int:
 
 def cmd_leads(args: argparse.Namespace) -> int:
     con = dbmod.connect(args.db)
+    contract.assert_contract(con)        # Schema-/Katalog-Drift-Gate (Loop 5)
     index = build_storage_index(con)
     prefixes = _plz_prefixes(args.plz) if args.plz else ()
     leads = list(
@@ -167,6 +169,7 @@ def cmd_signals(args: argparse.Namespace) -> int:
     store = cs.load()
     nat_frei = store.natuerliche_personen_freigegeben()   # §0/I7: e.K./nat. Person liefern? Default aus.
     con = dbmod.connect(args.db)
+    contract.assert_contract(con)        # Schema-/Katalog-Drift-Gate (Loop 5): laut stoppen, nicht still liefern
     qa_con = statemod.connect()
     woche = metricsmod.iso_woche()
     heute = dt.date.today().isoformat()
@@ -319,6 +322,7 @@ def cmd_qa(args: argparse.Namespace) -> int:
 def cmd_snapshot(args: argparse.Namespace) -> int:
     """Schreibe einen schlanken, dated Wochen-Snapshot (D2) + optionales Prune."""
     con = dbmod.connect(args.db)
+    contract.assert_contract(con)        # Schema-/Katalog-Drift-Gate (Loop 5)
     out = snapstore.write_snapshot(con, datum=args.datum or None)
     con.close()
     print(f"OK -> {out}")
@@ -351,6 +355,8 @@ def cmd_diff(args: argparse.Namespace) -> int:
             raise SystemExit(f"Gebiet '{args.gebiet}' nicht im Config-Store ({config.CONFIG_STORE_PATH}).")
         prefixes = tuple(g.get("plz_prefixes", ()))
     con = dbmod.connect(args.db) if not args.no_enrich else None
+    if con is not None:
+        contract.assert_contract(con)    # Schema-/Katalog-Drift-Gate (Loop 5), nur im Enrich-Pfad
     qa_con = statemod.connect()
     try:
         records = list(diff_based.diff_based_signals(
@@ -419,6 +425,7 @@ def cmd_evidenz_check(args: argparse.Namespace) -> int:
     else:
         raise SystemExit("Bitte --gebiet <id> oder --plz <präfixe> angeben.")
     con = dbmod.connect(args.db)
+    contract.assert_contract(con)        # Schema-/Katalog-Drift-Gate (Loop 5): laut stoppen, nicht still liefern
     qa_con = statemod.connect()
     try:
         index = build_storage_index(con)
@@ -502,6 +509,7 @@ def cmd_liefern(args: argparse.Namespace) -> int:
         raise SystemExit(f"Gebiet '{args.gebiet}' nicht im Config-Store ({config.CONFIG_STORE_PATH}).")
     name = g.get("name", args.gebiet)
     con = dbmod.connect(args.db)
+    contract.assert_contract(con)        # Schema-/Katalog-Drift-Gate (Loop 5): laut stoppen, nicht still liefern
     qa_con = statemod.connect()
     try:
         b = deliver.run_region(con, qa_con, plz_prefixes=tuple(g.get("plz_prefixes", ())),
@@ -541,6 +549,7 @@ def cmd_mengen(args: argparse.Namespace) -> int:
     store = cs.load()
     targets = [store.gebiet(args.gebiet)] if args.gebiet else list(store.active_gebiete())
     con = dbmod.connect(args.db)
+    contract.assert_contract(con)        # Schema-/Katalog-Drift-Gate (Loop 5): laut stoppen, nicht still liefern
     qa_con = statemod.connect()
     buckets = []
     try:
@@ -564,6 +573,7 @@ def cmd_weekly(args: argparse.Namespace) -> int:
         print("1/3 build-db: Export neu laden (kann ~5-30 min dauern) …")
         export_adapter.build_db()
     con = dbmod.connect(args.db)
+    contract.assert_contract(con)        # frischer Export könnte format-gedriftet sein -> JETZT laut stoppen
     try:
         print("2/3 Snapshot schreiben …")
         out = snapstore.write_snapshot(con)
@@ -601,6 +611,7 @@ def cmd_gate_demo(args: argparse.Namespace) -> int:
     outdir.mkdir(parents=True, exist_ok=True)
     heute = dt.date.today().isoformat()
     con = dbmod.connect(args.db)
+    contract.assert_contract(con)        # Schema-/Katalog-Drift-Gate (Loop 5): laut stoppen, nicht still liefern
     qa_con = statemod.connect()
     buckets = []
     try:
@@ -701,6 +712,23 @@ def cmd_portal(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_verify_schema(args: argparse.Namespace) -> int:
+    """Daten-Kontrakt explizit prüfen (Schema-/Katalog-Drift) — vor dem Wochenlauf / in CI."""
+    con = dbmod.connect(args.db)
+    try:
+        probleme = contract.verify_contract(con)
+    finally:
+        con.close()
+    if not probleme:
+        print("Daten-Kontrakt OK ✓ — alle Pflicht-Tabellen/-Spalten + Katalog-Wert 'In Betrieb' vorhanden.")
+        return 0
+    print(f"Daten-Kontrakt VERLETZT ({len(probleme)} Punkt(e)) — Lauf würde still falsche/leere Leads liefern:")
+    for p in probleme:
+        print(f"  - {p}")
+    print("  → `inspect` zur Diagnose; open-mastr-Exportformat prüfen.")
+    return 1
+
+
 def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     p = argparse.ArgumentParser(prog="pipeline", description="MaStR-Lead-Pipeline (B-Backbone)")
@@ -709,6 +737,10 @@ def main(argv: list[str] | None = None) -> int:
 
     sp = sub.add_parser("inspect", help="Tabellen/Spalten der DB auflösen + gegen config.py prüfen")
     sp.set_defaults(func=cmd_inspect)
+
+    svs = sub.add_parser("verify-schema",
+                         help="Daten-Kontrakt prüfen (Schema-/Katalog-Drift) — vor dem Wochenlauf / in CI")
+    svs.set_defaults(func=cmd_verify_schema)
 
     sb = sub.add_parser("build-db", help="Gesamtexport via open-mastr -> SQLite laden (~3 GB)")
     sb.add_argument("--data", nargs="*", help=f"open-mastr data= (Default {config.OPENMASTR_DATA})")
