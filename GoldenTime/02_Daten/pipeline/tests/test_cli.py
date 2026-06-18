@@ -511,8 +511,8 @@ class TestCmdMengen(unittest.TestCase):
         self.assertEqual(rc, 0)
         self.assertIn("EHRLICHER MENGEN-/DICHTE-REPORT", out)
         self.assertIn("Münsterland", out)
-        # Reconciliation-Lesart steht im Report (Q4-Ehrlichkeit)
-        self.assertIn("lieferbar + QA-pend + namenlos + rejected + geplant = roh", out)
+        # Reconciliation-Lesart steht im Report (Q4-Ehrlichkeit) — inkl. e.K.-gesperrt-Term (S0).
+        self.assertIn("lieferbar + eK-gesperrt + QA-pend + namenlos + rejected + geplant = roh", out)
 
     def test_mengen_unbekanntes_gebiet_wird_uebersprungen(self):
         # store.gebiet('xx') -> None -> targets=[None] -> Schleife überspringt; Report bleibt leer (0 Zeilen).

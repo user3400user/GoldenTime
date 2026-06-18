@@ -12,6 +12,8 @@ Metrik-Aggregation) lebt in qualify/qa_gate.py, ledger/ledger.py bzw. control/me
 """
 from __future__ import annotations
 
+import contextlib
+import datetime as dt
 import sqlite3
 from pathlib import Path
 
@@ -43,13 +45,15 @@ CREATE TABLE IF NOT EXISTS exclusivity (
 );
 
 -- Lieferprotokoll (Dedupe: dieselbe Einheit nicht zweimal an denselben Käufer/dieselbe Funktion).
+-- betreiber_mastr_nr = ABR -> Basis der Betriebs-Exklusivität (ein Betrieb = ein Käufer je Funktion).
 CREATE TABLE IF NOT EXISTS delivery (
-  einheit_mastr_nr TEXT NOT NULL,
-  kaeufer          TEXT NOT NULL,
-  funktion         TEXT NOT NULL,
-  gebiet           TEXT,
-  trigger          TEXT,
-  geliefert_am     TEXT,
+  einheit_mastr_nr   TEXT NOT NULL,
+  kaeufer            TEXT NOT NULL,
+  funktion           TEXT NOT NULL,
+  gebiet             TEXT,
+  trigger            TEXT,
+  betreiber_mastr_nr TEXT,
+  geliefert_am       TEXT,
   PRIMARY KEY (einheit_mastr_nr, kaeufer, funktion)
 );
 
@@ -91,7 +95,42 @@ def connect(db_path: Path | str | None = None) -> sqlite3.Connection:
 
 def init_schema(con: sqlite3.Connection) -> None:
     con.executescript(SCHEMA)
+    # Idempotente Migration: betreiber_mastr_nr in delivery (Betriebs-Exklusivität, Loop 0). Für Alt-DBs,
+    # deren delivery-Tabelle (CREATE IF NOT EXISTS = no-op) die Spalte noch nicht hat. ALTER schlägt auf
+    # frischen DBs (Spalte schon da) mit OperationalError fehl → unterdrückt. DANACH der Betriebs-Index.
+    with contextlib.suppress(sqlite3.OperationalError):
+        con.execute("ALTER TABLE delivery ADD COLUMN betreiber_mastr_nr TEXT")
+    con.execute("CREATE INDEX IF NOT EXISTS ix_delivery_betrieb ON delivery (betreiber_mastr_nr, funktion)")
     con.commit()
+
+
+def backup_state_db(db_path: Path | str | None = None,
+                    backup_dir: Path | str | None = None) -> Path:
+    """Konsistente, timestamped Sicherungskopie der NICHT-regenerierbaren pipeline_state.db.
+
+    Aufruf VOR dem ersten echten ``--commit`` (Sprint-Zwang 6): die QA-Entscheide + das Exklusiv-/
+    Liefer-Ledger sind nicht aus dem open-mastr-Export wiederherstellbar — ein Verlust zerstört das
+    Exklusivitäts-Versprechen unwiederbringlich. Nutzt die sqlite ``.backup``-API (WAL-konsistent,
+    auch während Leser offen sind). Gibt den Backup-Pfad zurück; legt ``backups/`` bei Bedarf an.
+    """
+    src_path = Path(db_path or config.PIPELINE_DB_PATH)
+    bdir = Path(backup_dir) if backup_dir else src_path.parent / "backups"
+    bdir.mkdir(parents=True, exist_ok=True)
+    stamp = dt.datetime.now().strftime("%Y%m%dT%H%M%S")
+    dest = bdir / f"pipeline_state_{stamp}.db"
+    # Read-only-Quelle, falls vorhanden (sonst leere DB anlegen → leeres, valides Backup).
+    if src_path.exists():
+        src = sqlite3.connect(f"file:{src_path}?mode=ro", uri=True)
+    else:
+        src = sqlite3.connect(str(src_path))
+    dst = sqlite3.connect(str(dest))
+    try:
+        with dst:
+            src.backup(dst)
+    finally:
+        src.close()
+        dst.close()
+    return dest
 
 
 def qa_pending(con: sqlite3.Connection, limit: int = 100) -> list:

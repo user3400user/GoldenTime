@@ -73,6 +73,18 @@ class ConfigStore:
         ov = (g.get("trigger_overrides") or {}).get(trigger)
         return ov is None or bool(ov)
 
+    def natuerliche_personen_freigegeben(self) -> bool:
+        """Politik-Gate (S0 · §0 · I7): dürfen natürliche Personen / e.K. an Kunden geliefert werden?
+
+        Default **AUS** — bis ein Mensch nach anwaltlichem Art-6(1)(f)-Verdikt freischaltet (Bisnode/UODO
+        + LG Kiel: 'öffentliche Herkunft' legitimiert den Resale NICHT automatisch). Liegt in
+        ``extras['policy']`` (Top-Level-Passthrough), damit ein älteres config_store.json OHNE den
+        Schlüssel sicher auf False defaultet — fail-safe in Richtung 'nicht liefern'. Robust gegen
+        korruptes ``policy`` (non-dict) → False statt Crash im Invarianten-Gate.
+        """
+        pol = self.extras.get("policy")
+        return bool(pol.get("natuerliche_personen_freigegeben", False)) if isinstance(pol, dict) else False
+
 
 def _default_raw() -> dict:
     """Eingebaute Default-Struktur (Default-Aus exakt nach Briefing §3 / Expansions-Analyse §3)."""
@@ -94,6 +106,13 @@ def _default_raw() -> dict:
         },
         "modules": {
             "anreicherung": {"enabled": False, "label": "Entscheider/Kontakt — scharf erst nach Call + Lizenz"},
+        },
+        # Politik-Schalter (Passthrough via extras; nicht-strukturell, von _validate ignoriert).
+        "policy": {
+            "natuerliche_personen_freigegeben": False,
+            "_comment": ("S0/§0/I7: natürliche Personen / e.K. erst nach anwaltlicher Art-6(1)(f)-"
+                         "Freigabe an Kunden liefern. Default aus → e.K. werden hart aus dem "
+                         "lieferbar-Bucket gefiltert (Bisnode/UODO + LG Kiel)."),
         },
         "gebiete": [
             {"id": "muensterland", "name": "Münsterland", "enabled": True,
@@ -213,8 +232,11 @@ def save(store: ConfigStore, *, updated_by: str = "dashboard",
     """Atomar schreiben (nur vom Dashboard). os.replace → Reader sieht nie eine halbe Datei."""
     p = Path(path or config.CONFIG_STORE_PATH)
     now = _now or dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
+    # extras (u.a. der invarianten-tragende policy-Block) MUSS durchgereicht werden — sonst löscht
+    # jeder Dashboard-Toggle die natuerliche_personen_freigegeben-Freigabe + den Audit-Kommentar
+    # still (Refute MEDIUM: fail-safe zwar re-locked, aber ein realer Operability-Defekt).
     stamped = ConfigStore(store.schema_version, store.triggers, store.modules,
-                          store.gebiete, updated_at=now, updated_by=updated_by)
+                          store.gebiete, updated_at=now, updated_by=updated_by, extras=store.extras)
     errors = _validate(_to_raw(stamped))
     if errors:
         raise ConfigError("save() abgelehnt — ungültiger Store:\n  - " + "\n  - ".join(errors))

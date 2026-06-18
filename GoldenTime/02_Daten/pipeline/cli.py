@@ -114,6 +114,16 @@ def cmd_leads(args: argparse.Namespace) -> int:
 
     deliver = [x for x in leads if x["ausschluss_grund"] is None]
     excluded = [x for x in leads if x["ausschluss_grund"] is not None]
+    # e.K./natürliche Person auch aus dem (Legacy-)leads-CSV halten (§0/I7), solange nicht freigegeben.
+    # Dict-Pfad ohne SignalRecord: am e.K.-Namensmuster bzw. einem NATUERLICHE/PRIVATPERSON-Flag.
+    if not cs.load().natuerliche_personen_freigegeben():
+        nat = [x for x in deliver
+               if hierarchy.ist_natuerliche_person_name(x.get("betreiber"))
+               or any("NATUERLICHE" in f or "PRIVATPERSON" in f for f in (x.get("flags") or ()))]
+        if nat:
+            nat_ids = {id(x) for x in nat}
+            deliver = [x for x in deliver if id(x) not in nat_ids]
+            print(f"  e.K./nat. Person aus Lieferliste gefiltert (§0): {len(nat)}")
     deliver.sort(key=lambda x: (x["reg_datum"] or "", x["kwp"]), reverse=True)  # frischeste oben
 
     region = args.region_name or (("PLZ " + "/".join(prefixes)) if prefixes else (args.bundesland or "alle"))
@@ -155,6 +165,7 @@ def _resolve_targets(store, args) -> list[tuple[str, str, tuple[str, ...]]]:
 def cmd_signals(args: argparse.Namespace) -> int:
     """Post-EEG-Signal-Shipper (T2): cohort -> qualify (market-Join) -> QA-Gate -> SignalRecord-CSV."""
     store = cs.load()
+    nat_frei = store.natuerliche_personen_freigegeben()   # §0/I7: e.K./nat. Person liefern? Default aus.
     con = dbmod.connect(args.db)
     qa_con = statemod.connect()
     woche = metricsmod.iso_woche()
@@ -184,11 +195,14 @@ def cmd_signals(args: argparse.Namespace) -> int:
             namenlos = [r for r in rest if not r.entity]
             pending = [r for r in rest if r.qa_status == qa_gate.PENDING]
             rejected = [r for r in rest if r.qa_status == qa_gate.REJECTED]
-            # Monitoring-Metrik = ROHE lieferbare Dichte (vor käuferspezifischem Ledger-Dedup), damit
-            # sie mit deliver.run_region/_record_metrics konsistent ist (Bug-Hunt: sonst clobbern sich
-            # die 'lieferbar'/'dv_flag'-Werte je nachdem, welcher Befehl zuletzt für Gebiet/Woche lief).
+            # e.K./natürliche Person HART aus der Lieferliste (§0/I7) über den gemeinsamen Choke-Point —
+            # kein Funnel darf die Rechts-Invariante umgehen (S0: Filter in ALLEN Funneln).
+            deliver, gesperrt = hierarchy.partition_natuerliche(deliver, nat_frei)
+            # Monitoring-Metrik = lieferbare Dichte NACH e.K.-Filter, aber VOR käuferspezifischem Ledger-
+            # Dedup, damit sie mit deliver.run_region/_record_metrics konsistent ist (Bug-Hunt: sonst
+            # clobbern sich die 'lieferbar'/'dv_flag'-Werte je nachdem, welcher Befehl zuletzt lief).
             roh_lieferbar, roh_dv = len(deliver), sum(r.dv_flag for r in deliver)
-            if args.kaeufer and args.funktion:   # optionales Ledger-Gate (Exklusivität + Dedupe)
+            if args.kaeufer and args.funktion:   # optionales Ledger-Gate (Exklusivität+Dedupe, read-only Vorschau)
                 deliver = ledgermod.filter_deliverable(qa_con, deliver, args.kaeufer, args.funktion, gid, "T2")
             deliver.sort(key=lambda r: (r.dv_flag, r.kwp or 0), reverse=True)  # DV + größte zuerst
 
@@ -200,13 +214,15 @@ def cmd_signals(args: argparse.Namespace) -> int:
 
             for metrik, wert in (("signale", len(records)), ("lieferbar", roh_lieferbar),
                                  ("pending_qa", len(pending)), ("namenlos", len(namenlos)),
+                                 ("nat_gesperrt", len(gesperrt)),
                                  ("speicher_geplant", len(geplant)),
                                  ("dv_flag", roh_dv)):
                 metricsmod.record(qa_con, metrik=metrik, wert=wert, woche=woche, gebiet=gid, trigger="T2")
 
             print(f"Gebiet {name}: {len(records)} T2-Signale · {len(deliver)} lieferbar · "
-                  f"{len(pending)} QA-pending · {len(namenlos)} namenlos · {len(geplant)} Speicher-geplant · "
-                  f"{len(rejected)} rejected · DV-Flag {sum(r.dv_flag for r in deliver)}.")
+                  f"{len(pending)} QA-pending · {len(namenlos)} namenlos · {len(gesperrt)} e.K.-gesperrt · "
+                  f"{len(geplant)} Speicher-geplant · {len(rejected)} rejected · "
+                  f"DV-Flag {sum(r.dv_flag for r in deliver)}.")
             if deliver and not args.offline:
                 print(f"  Evidenz-Direktlinks: {aufgeloest}/{len(deliver)} aufgelöst "
                       f"(Rest: robuster Such-Link + SEE-Prüf-Nummer).")
@@ -345,6 +361,10 @@ def cmd_diff(args: argparse.Namespace) -> int:
             for r in records:
                 qa_gate.apply_qa(r, qa_con)
         deliver = [r for r in records if r.qa_status in (qa_gate.AUTO_OK, qa_gate.APPROVED) and r.entity]
+        # e.K./natürliche Person HART aus dem FLUSS-Liefer-CSV (§0/I7) — derselbe Choke-Point wie die
+        # anderen Funnel (Refute HIGH: cmd_diff schrieb e.K. ungefiltert ins kundenfähige diff_signals_*.csv;
+        # latent bis zum 2. Snapshot, dann scharf). nat_frei aus dem Config-Store (Default aus).
+        deliver, nat_gesperrt = hierarchy.partition_natuerliche(deliver, store.natuerliche_personen_freigegeben())
         pending = [r for r in records if r.qa_status == qa_gate.PENDING]
         namenlos = [r for r in records if not r.entity]
     finally:
@@ -353,7 +373,7 @@ def cmd_diff(args: argparse.Namespace) -> int:
         qa_con.close()
     print(f"Diff {prev.name} -> {curr.name}: {len(records)} Signale "
           f"(Trigger: {dict(Counter(r.trigger_typ for r in records))}) · {len(deliver)} lieferbar · "
-          f"{len(pending)} QA-pending · {len(namenlos)} namenlos.")
+          f"{len(nat_gesperrt)} e.K.-gesperrt · {len(pending)} QA-pending · {len(namenlos)} namenlos.")
     if deliver:
         out = Path(args.out) if args.out else Path(f"diff_signals_{dt.date.today().isoformat()}.csv")
         _write_signals_csv(out, deliver)
@@ -419,9 +439,63 @@ def cmd_evidenz_check(args: argparse.Namespace) -> int:
     return 0 if res["fehler"] == 0 else 1
 
 
+def _commit_guard(kaeufer: str, funktion: str) -> str | None:
+    """Darf ein echtes ``--commit`` (reserve + record_delivery ins Live-Ledger) laufen?
+
+    Gibt eine Fehlermeldung zurück (→ abbrechen) oder ``None`` (→ erlaubt). Zwei harte Gates:
+      * Käufer+Funktion Pflicht — eine echte Lieferung ist käufer-/funktionsgebunden.
+      * ``config.LIVE_DELIVERY_ENABLED`` muss AN sein (§0/I8) — sonst ist die echte Lieferung an einen
+        zahlenden Kunden bis zur anwaltlichen Art-6(1)(f)-Freigabe gesperrt; Demos nutzen den Dry-Run.
+    """
+    if not (kaeufer and funktion):
+        return "--commit verlangt --kaeufer UND --funktion (echte Lieferung ist käufer-/funktionsgebunden)."
+    if not config.LIVE_DELIVERY_ENABLED:
+        return ("--commit GESPERRT: LIVE_DELIVERY_ENABLED ist aus (§0). Echte Lieferung an einen zahlenden "
+                "Kunden ist bis zur anwaltlichen Art-6(1)(f)-Freigabe verboten; ein Mensch setzt den Schalter. "
+                "Für Demos den Dry-Run nutzen (ohne --commit) — er füllt das Live-Ledger nie.")
+    return None
+
+
+def _commit_buckets(qa_con, buckets: list, kaeufer: str, funktion: str) -> int:
+    """Backup → atomares reserve+record_delivery je Bucket (``commit_delivery``, BEGIN IMMEDIATE).
+
+    Gibt Σ NEU protokollierter Einheiten zurück. NUR nach bestandenem ``_commit_guard`` aufrufen
+    (LIVE_DELIVERY_ENABLED an). Backup VOR dem ersten Schreibvorgang (Sprint-Zwang 6, Ledger nicht
+    regenerierbar).
+    """
+    bpath = statemod.backup_state_db()
+    print(f"  Backup pipeline_state.db -> {bpath}")
+    gesamt = 0
+    for b in buckets:
+        if not b.gebiet_id:
+            continue
+        neu = ledgermod.commit_delivery(qa_con, b.lieferbar, kaeufer, funktion, b.gebiet_id, b.ledger_trigger)
+        print(f"  COMMIT {b.region}: {len(neu)} Einheiten neu protokolliert · Exklusivität "
+              f"{funktion}×{b.gebiet_id}×{b.ledger_trigger} reserviert für {kaeufer}.")
+        gesamt += len(neu)
+    # WICHTIG (Refute HIGH): es gibt kein SMTP — --commit FÜHRT DEN VERSAND NICHT DURCH. Es protokolliert
+    # die Leads als 'geliefert' (nicht regenerierbarer Ledger). Der Versand des Liefer-Pakets (oben
+    # geschriebene CSV+Mail) ist ein MANUELLER Schritt; --commit ist die bewusste Post-Versand-Bestätigung.
+    print(f"  ⚠ --commit hat {gesamt} Einheiten als GELIEFERT an '{kaeufer}' protokolliert (Dedupe-/"
+          "Exklusiv-Sperre dauerhaft). KEIN automatischer Versand — stelle sicher, dass das Paket "
+          "tatsächlich an den Käufer versendet wurde/wird, sonst weicht der Ledger-Stand vom realen Versand ab.")
+    return gesamt
+
+
 def cmd_liefern(args: argparse.Namespace) -> int:
-    """Liefer-Paket für ein Gebiet: getrennte Bucket-CSVs (lieferbar/QA/namenlos) + Liefer-Mail (TEIL 5)."""
+    """Liefer-Paket für ein Gebiet: getrennte Bucket-CSVs (lieferbar/QA/namenlos) + Liefer-Mail (TEIL 5).
+
+    Default = Dry-Run (read-only Vorschau, 0 Ledger-Zeilen). Mit ``--commit`` (+ --kaeufer/--funktion,
+    nur bei ``LIVE_DELIVERY_ENABLED=1``) wird die Lieferung atomar protokolliert (Exklusivität+Dedupe).
+    """
     store = cs.load()
+    nat_frei = store.natuerliche_personen_freigegeben()
+    commit = getattr(args, "commit", False)
+    if commit:
+        fehler = _commit_guard(args.kaeufer, args.funktion)
+        if fehler:
+            print("ABBRUCH: " + fehler)
+            return 2
     g = store.gebiet(args.gebiet)
     if not g:
         raise SystemExit(f"Gebiet '{args.gebiet}' nicht im Config-Store ({config.CONFIG_STORE_PATH}).")
@@ -430,28 +504,34 @@ def cmd_liefern(args: argparse.Namespace) -> int:
     qa_con = statemod.connect()
     try:
         b = deliver.run_region(con, qa_con, plz_prefixes=tuple(g.get("plz_prefixes", ())),
-                               region=name, gebiet_id=args.gebiet, resolve=not args.offline)
+                               region=name, gebiet_id=args.gebiet, resolve=not args.offline,
+                               kaeufer=args.kaeufer, funktion=args.funktion, nat_personen_frei=nat_frei)
+        slug, heute = _slug(name), dt.date.today().isoformat()
+        outdir = Path(args.out_dir) if args.out_dir else Path(".")
+        outdir.mkdir(parents=True, exist_ok=True)
+        for label, recs in (("lieferbar", b.lieferbar), ("qa_pending", b.pending),
+                            ("namenlos", b.namenlos), ("speicher_geplant", b.speicher_geplant)):
+            if recs:
+                p = outdir / f"{slug}_{label}_{heute}.csv"
+                _write_signals_csv(p, recs)
+                print(f"  {label:16s}: {len(recs):4d} -> {p}")
+        mail = deliver.liefer_mail(b, kaeufer=args.kaeufer, funktion=args.funktion or "Speicher-Installateur")
+        mp = outdir / f"{slug}_liefermail_{heute}.txt"
+        mp.write_text(mail, encoding="utf-8")
+        print(f"  mail            :      -> {mp}")
+        print(f"Gebiet {name}: {len(b.lieferbar)} lieferbar ({b.betriebe()} Betriebe) · {len(b.pending)} QA-pending · "
+              f"{len(b.namenlos)} namenlos · {len(b.speicher_geplant)} Speicher-geplant · "
+              f"{b.colocated_ausgeschlossen} colocated-ausgeschlossen.")
+        if args.print_mail:
+            print("\n" + "=" * 78 + "\n" + mail)
+        # Commit ZULETZT — erst nachdem CSV+Mail auf der Platte liegen (Refute HIGH: nie 'geliefert'
+        # protokollieren, bevor das Liefer-Paket existiert).
+        if commit:
+            n = _commit_buckets(qa_con, [b], args.kaeufer, args.funktion)
+            print(f"  → {n} Einheiten ins Live-Ledger protokolliert.")
     finally:
         con.close()
         qa_con.close()
-    slug, heute = _slug(name), dt.date.today().isoformat()
-    outdir = Path(args.out_dir) if args.out_dir else Path(".")
-    outdir.mkdir(parents=True, exist_ok=True)
-    for label, recs in (("lieferbar", b.lieferbar), ("qa_pending", b.pending),
-                        ("namenlos", b.namenlos), ("speicher_geplant", b.speicher_geplant)):
-        if recs:
-            p = outdir / f"{slug}_{label}_{heute}.csv"
-            _write_signals_csv(p, recs)
-            print(f"  {label:16s}: {len(recs):4d} -> {p}")
-    mail = deliver.liefer_mail(b, kaeufer=args.kaeufer, funktion=args.funktion or "Speicher-Installateur")
-    mp = outdir / f"{slug}_liefermail_{heute}.txt"
-    mp.write_text(mail, encoding="utf-8")
-    print(f"  mail            :      -> {mp}")
-    print(f"Gebiet {name}: {len(b.lieferbar)} lieferbar ({b.betriebe()} Betriebe) · {len(b.pending)} QA-pending · "
-          f"{len(b.namenlos)} namenlos · {len(b.speicher_geplant)} Speicher-geplant · "
-          f"{b.colocated_ausgeschlossen} colocated-ausgeschlossen.")
-    if args.print_mail:
-        print("\n" + "=" * 78 + "\n" + mail)
     return 0
 
 
@@ -500,8 +580,20 @@ def cmd_weekly(args: argparse.Namespace) -> int:
 
 
 def cmd_gate_demo(args: argparse.Namespace) -> int:
-    """Gate-Demo-Paket (B): Liefer-Pakete für die Demo-Gebiete + ehrlicher Mengen-Report, ein Lauf."""
+    """Gate-Demo-Paket (B): Liefer-Pakete für die Demo-Gebiete + ehrlicher Mengen-Report, ein Lauf.
+
+    Default = Dry-Run (read-only Vorschau, 0 Ledger-Zeilen — so wird die Demo gezeigt). Mit ``--commit``
+    (+ --kaeufer/--funktion, nur bei ``LIVE_DELIVERY_ENABLED=1``) würde echt protokolliert; bei
+    ausgeschaltetem Schalter bricht der Befehl mit klarer Meldung ab (§0, Demo füllt das Live-Ledger nie).
+    """
     store = cs.load()
+    nat_frei = store.natuerliche_personen_freigegeben()
+    commit = getattr(args, "commit", False)
+    if commit:
+        fehler = _commit_guard(args.kaeufer, args.funktion)
+        if fehler:
+            print("ABBRUCH: " + fehler)
+            return 2
     gids = ([g.strip() for g in args.gebiete.split(",") if g.strip()]
             if args.gebiete else [g["id"] for g in store.active_gebiete()])
     outdir = Path(args.out_dir) if args.out_dir else Path("gate_demo")
@@ -519,7 +611,8 @@ def cmd_gate_demo(args: argparse.Namespace) -> int:
                 continue
             name = g.get("name", gid)
             b = deliver.run_region(con, qa_con, plz_prefixes=tuple(g.get("plz_prefixes", ())),
-                                   region=name, gebiet_id=gid, resolve=not args.offline, index=index)
+                                   region=name, gebiet_id=gid, resolve=not args.offline, index=index,
+                                   kaeufer=args.kaeufer, funktion=args.funktion, nat_personen_frei=nat_frei)
             buckets.append(b)
             slug = _slug(name)
             for label, recs in (("lieferbar", b.lieferbar), ("qa_pending", b.pending),
@@ -531,6 +624,9 @@ def cmd_gate_demo(args: argparse.Namespace) -> int:
                                     funktion=args.funktion or "Speicher-Installateur"), encoding="utf-8")
             print(f"  {name}: {len(b.lieferbar)} lieferbar ({b.betriebe()} Betriebe) "
                   f"-> {slug}_lieferbar/qa_pending/namenlos/speicher_geplant_*.csv + Mail")
+        if commit:
+            n = _commit_buckets(qa_con, buckets, args.kaeufer, args.funktion)
+            print(f"Σ {n} Einheiten ins Live-Ledger protokolliert.")
     finally:
         con.close()
         qa_con.close()
@@ -585,6 +681,9 @@ def main(argv: list[str] | None = None) -> int:
     sf.add_argument("--out-dir", default="")
     sf.add_argument("--offline", action="store_true", help="ohne Evidenz-Direktlink-Auflösung")
     sf.add_argument("--print-mail", action="store_true", help="Liefer-Mail zusätzlich ausgeben")
+    sf.add_argument("--commit", action="store_true",
+                    help="echte Lieferung ins Live-Ledger protokollieren (Exklusivität+Dedupe); "
+                         "nur bei LIVE_DELIVERY_ENABLED=1, sonst Abbruch. Default = Dry-Run.")
     sf.set_defaults(func=cmd_liefern)
 
     sm = sub.add_parser("mengen", help="ehrlicher Mengen-/Dichte-Report (Betriebe UND Einheiten)")
@@ -602,6 +701,9 @@ def main(argv: list[str] | None = None) -> int:
     sgd.add_argument("--funktion", default="")
     sgd.add_argument("--out-dir", default="")
     sgd.add_argument("--offline", action="store_true")
+    sgd.add_argument("--commit", action="store_true",
+                     help="echte Lieferung ins Live-Ledger protokollieren; nur bei LIVE_DELIVERY_ENABLED=1, "
+                          "sonst Abbruch. Default = Dry-Run (read-only, füllt das Live-Ledger nie).")
     sgd.set_defaults(func=cmd_gate_demo)
 
     sq = sub.add_parser("qa", help="Mensch-QA-Gate (D5): Queue / approve / reject / approve-abr")

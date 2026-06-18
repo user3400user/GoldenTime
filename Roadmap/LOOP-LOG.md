@@ -59,4 +59,41 @@ Geprüfte Alternativen für die erste Bau-Schleife:
 - **Parallel-Track (Freigabe nötig, kalender-gated):** zweiten MaStR-`build-db`+Snapshot anstoßen, damit der T1/T4-Fluss-Beweis (Säule 1) tickt, während G0 gebaut wird. *(Heavy-Op + Format-Bruch-Guardrail → bewusst nicht autonom gestartet.)*
 - **Graft-Entscheid:** e.K.-Hartfilter (S0) in diese Schleife ziehen (ja/nein) — billig, macht den Demo-Bucket DSGVO-sauber und liefert die Dichte-Messung.
 
-**Status: ⏸ CHECKPOINT — wartet auf Freigabe, bevor die erste Bau-Schleife startet.**
+**Status: ✅ FREIGEGEBEN (Gründer 18.06.: G0 + 2. Snapshot + e.K.-Filter) → durchgeführt (s.u.).**
+
+---
+
+## Loop 0 · Durchführung + Closeout (18.06.2026) — ABGESCHLOSSEN
+
+### Gebaut (autonomer Modus)
+- **USP erzwungen:** `ledger.commit_delivery` (atomar, `BEGIN IMMEDIATE`) verdrahtet in `run_region` (Dry-Run-Vorschau, read-only) + CLI `--commit` (gate-demo/liefern). Dedupe (einheit×kaeufer×funktion) + Gebiets-Reservierung (funktion×gebiet×trigger).
+- **e.K.-Hartfilter** (§0/I7) über gemeinsamen Choke-Point `hierarchy.partition_natuerliche` in **allen** Funneln (run_region, cmd_signals, cmd_diff) + Legacy cmd_leads; config_store-Schalter `natuerliche_personen_freigegeben` (Default aus).
+- **LIVE-Guard** (I8): `config.LIVE_DELIVERY_ENABLED` (Default aus, CC setzt nie); `--commit` verweigert solange aus; Backup-vor-Commit (`state.backup_state_db`, Zwang 6); dl-de-Wortlaut (G24).
+
+### Refute (§6.5.4 · 3-Winkel-Workflow, skeptiker-verifiziert) → 9 Funde, alle adressiert
+- **[CRITICAL] Versprechen↔Schloss-Lücke:** Mail versprach Betriebs-Exklusivität, Schloss arbeitete auf Einheit×Gebiet×Trigger → derselbe Betrieb (ABR) in zwei Gebieten ginge an zwei „exklusive" Käufer. **Fix:** **Betriebs-Ebene-Exklusivität** (`betrieb_fremd_vergeben`, neue `delivery.betreiber_mastr_nr`-Spalte + Index) — ein Betrieb = ein Käufer je Funktion, gebiets- UND trigger-übergreifend; + Mail ehrlich gemacht.
+- **[HIGH] cross-Trigger-Leck** → durch Betriebs-Ebene mitgeschlossen (trigger-agnostisch).
+- **[HIGH] cmd_diff (FLUSS) ohne e.K.-Filter** → Choke-Point eingezogen.
+- **[HIGH] `--commit` vor Versand** → Reihenfolge umgekehrt (CSV/Mail zuerst), klare „kein-SMTP/Versand-ist-manuell"-Warnung.
+- **[MED] cmd_leads e.K. · save() verwarf policy-extras · funktion-Normalisierung · ROLLBACK maskiert Lock-Fehler** → alle gefixt. **[LOW] non-dict-policy-Crash** → defensiv.
+- **[LOW, dokumentiert, nicht gefixt]** `cmd_ledger reserve/release` schreibt Live-Exklusivität ohne LIVE-Guard (pre-existing, manuelles Vertrags-Tool, kein Datenexport) → bewusst als manuelles Tool belassen, Kandidat für Funnel-Unifizierung (G28, M2).
+
+### Verifikation (§6.5.5 · Echtdaten + Tests)
+- **337 Tests grün** (313 + 24 G0). USP auf echten 41 Münsterland-Records bewiesen: 2. Commit = 0 (Dedupe), KäuferB = 0 (Exklusivität). Cross-Gebiet-Betriebs-Sperre per Unit-Test bewiesen; auf Demo-Daten 0 blockiert (lieferbare T2-Sets disjunkt — ehrlich). `--commit` bei LIVE=aus real verweigert, Live-Ledger leer. Migration der echten DB ok. Zahlen → `LOOP-METRICS.md`.
+
+### Re-Score (§4a, mit Beleg — Delta zu Ist 17.06.)
+| Dim | Ist 17.06. | Loop 0 | Beleg |
+|---|:--:|:--:|---|
+| 1 Funktionsumfang | 3 (eff. 2) | **3 (eff. 3)** | USP (Exklusivität/Dedupe) **funktioniert jetzt real** (`commit_delivery` verdrahtet, echtdaten-bewiesen) statt toter Ledger |
+| 2 Korrektheit | 4 | **4** (gehärtet) | adversariale Verifikation + 1 CRITICAL + 3 HIGH Versprechen-/Funnel-Lecks geschlossen; +24 Tests |
+| 6 Sicherheit Recht/Daten | 2 | **3** | §0 jetzt **im Code erzwungen** (e.K.-Hartfilter alle Funnel, LIVE-Guard, dl-de-Wortlaut) statt durch Abwesenheit |
+| 7 Datenqualität/Integrität | 3 | **3** (gehärtet) | Backup-vor-Commit (nicht-regenerierbarer Ledger); Reconciliation um e.K.-Term erweitert, geht auf |
+
+(Andere Dimensionen unverändert — bewusst nicht in dieser Schleife adressiert.)
+
+### Offen (in nächste Schleife) / Vertagt
+- **T1/T4-Fluss-Beweis** vertagt — MaStR-Download-Host blockt (extern, s. `LOOP-METRICS.md`).
+- **Mensch-QA-Durchlauf** der ~134 Pending vor dem Essen (auto_ok ≠ mensch-geprüft).
+- **Funnel-Unifizierung (G28):** cmd_signals/cmd_leads sind Export-/Analyst-Tools, kein committender Pfad — einziger committender Funnel ist run_region. Voll vereinheitlichen = M2.
+
+**Status Loop 0: ✅ ABGESCHLOSSEN — bereit für Merge nach `main` an der Schleifen-Grenze.**

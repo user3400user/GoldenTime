@@ -42,6 +42,15 @@ CONFIG_STORE_PATH = Path(
 # DB-Engine (D1): 'sqlite' jetzt; Postgres als ENV-Switch erst bei Hosting/Mehrschreiber.
 DB_ENGINE = os.environ.get("MASTR_DB_ENGINE", "sqlite")
 
+# --- Harte Liefer-Grenze (Briefing §0 / Invariante I8) ---------------------
+# Eine ECHTE Lieferung an einen zahlenden Kunden (``--commit`` → reserve + record_delivery ins
+# Live-Ledger) ist GESPERRT, bis ein MENSCH nach anwaltlicher Art-6(1)(f)-Freigabe diesen Schalter
+# umlegt (ENV ``LIVE_DELIVERY_ENABLED=1``). Claude Code setzt ihn NIE selbst (I8). Default AUS:
+#   * Demos / Gate-Demo / Mengen-Messung laufen ohne ``--commit`` (Dry-Run, read-only, 0 Ledger-Zeilen).
+#   * ``--commit`` wird bei ausgeschaltetem Schalter mit klarer Meldung verweigert → das Demo-Ledger
+#     kann nie das Live-Liefer-/Exklusivitäts-Ledger füllen (Sprint-Zwang 3, „Demo füllt Live nie").
+LIVE_DELIVERY_ENABLED = os.environ.get("LIVE_DELIVERY_ENABLED", "") == "1"
+
 # --- open-mastr Technologie-/Objekt-Auswahl (download(data=...)) -----------
 # Nur diese Datensätze laden statt aller ~30 Objekte: solar + storage genügen für den
 # ABR-Anywhere-Check; location (co-lokal) + market (gewerblich/PersonenArt) ergänzen.

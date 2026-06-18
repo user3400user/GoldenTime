@@ -186,6 +186,29 @@ aus dem Quellcode vermuteten deutschen XSD-Namen waren over-thought — `inspect
   - **DEFERRED (C1, begründet):** cohort-Single-Scan — Workflow-Entwurf `run_region_multi` hätte
     `colocated_ausgeschlossen` still auf 0 regressiert (ehrliche coloc-aus-Spalte!) für modesten Perf-Gewinn
     auf Nicht-Hot-Path → bewusst vertagt statt Ehrlichkeits-Kennzahl zu verlieren.
+- **LOOP-ENGINEERING Loop 0 „G0" (18.06., Branch `loop-engineering`, 337 Tests grün):** der USP
+  (Exklusivität+Dedupe) ist jetzt im Lieferpfad ERZWUNGEN. Neu/geändert:
+  - **`ledger.commit_delivery`** — atomar (`isolation_level=None` + `BEGIN IMMEDIATE`/`COMMIT`/geschütztes
+    `ROLLBACK`): Gebiets-Reservierung + Dedupe + **Betriebs-Ebene-Exklusivität**. `delivery.betreiber_mastr_nr`
+    (neue Spalte + Index `ix_delivery_betrieb`, idempotente Migration in `state.init_schema`).
+  - **Betriebs-Exklusivität** (`ledger.betrieb_fremd_vergeben`): ein Betrieb (ABR) = **ein Käufer je
+    Funktion, gebiets- UND trigger-übergreifend** (schließt Refute-CRITICAL cross-Gebiet + HIGH cross-Trigger).
+  - **Schlüssel-Normalisierung** (`ledger._nf`/`_ck`): funktion casefold+snake, kaeufer trim — 'Speicher-
+    Installateur'=='speicher_installateur' (sonst byte-genauer Dedupe-Bruch).
+  - **e.K.-Hartfilter** (§0/I7): gemeinsamer Choke-Point **`hierarchy.partition_natuerliche`** in run_region
+    + cmd_signals + cmd_diff (+ Legacy cmd_leads via `ist_natuerliche_person_name`). `hierarchy.ist_natuerliche_person`
+    = 3 Wege (PersonenArt-Proxy / FLAG_NATUERLICHE_PERSON / e.K.-Namensregex). Schalter
+    `config_store.natuerliche_personen_freigegeben()` (extras['policy'], Default aus, fail-safe; `save()` reicht
+    extras jetzt durch — sonst kippte jeder Dashboard-Toggle die Freigabe still zurück).
+  - **LIVE-Guard** (I8): `config.LIVE_DELIVERY_ENABLED` (ENV, Default aus, **CC setzt nie**); CLI `--commit`
+    (gate-demo/liefern) wird via `_commit_guard` verweigert solange aus → Demo füllt Live-Ledger nie. `--commit`
+    schreibt CSV/Mail ZUERST, dann `_commit_buckets` (Backup `state.backup_state_db` → commit_delivery) + klare
+    „kein-SMTP/Versand-ist-manuell"-Warnung. Mengen-Report: `eK-gesp`-Spalte + Reconciliation
+    `lieferbar+eK-gesperrt+QA-pend+namenlos+rejected+geplant=roh`. `deliver.DL_DE` mit Lizenz-URL+Disclaimer (G24).
+  - **Echtdaten-bewiesen** (Temp-Ledger, real + I8 unberührt): Münsterland 41 lieferbar → 2. Commit 0 (Dedupe),
+    KäuferB 0 (Exklusivität); e.K.-gesperrt 0 (benannte nat. Pers. laufen ohnehin über QA-pending). T1/T4-Snapshot
+    **vertagt** (MaStR-Download-Host `download.marktstammdatenregister.de` resettet aktiv — extern, nicht Code).
+  - Lebende Loop-Artefakte: `Roadmap/{KONZEPT-LANDKARTE,LOOP-LOG,LOOP-METRICS}.md` (+ Briefing v3).
 - `02_Daten/.venv/` — lokales venv (gitignored), **open-mastr 0.17.1** + Deps installiert
   (System-`python3` hat kein pip → via `get-pip.py` gebootstrappt, kein sudo).
 - **Phase 0 ABGESCHLOSSEN (16.06.):** `build-db` echter Lauf ✅ (Export-DB 8,6 GB, Download 1575 s), `inspect` ✅,

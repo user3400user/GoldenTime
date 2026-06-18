@@ -16,6 +16,10 @@
   "modules": {
     "anreicherung": {"enabled": false, "label": "Entscheider/Kontakt — scharf erst nach Call + Lizenz"}
   },
+  "policy": {
+    "natuerliche_personen_freigegeben": false,
+    "_comment": "S0/§0/I7: natürliche Personen / e.K. erst nach anwaltlicher Art-6(1)(f)-Freigabe an Kunden liefern. Default aus → e.K. werden hart aus dem lieferbar-Bucket gefiltert (Bisnode/UODO + LG Kiel). Nur ein Mensch schaltet frei."
+  },
   "gebiete": [
     {"id": "muensterland", "name": "Münsterland", "enabled": true,  "plz_prefixes": ["48", "59"], "trigger_overrides": {}},
     {"id": "osnabrueck",   "name": "Raum Osnabrück", "enabled": true,  "plz_prefixes": ["49"], "trigger_overrides": {}},

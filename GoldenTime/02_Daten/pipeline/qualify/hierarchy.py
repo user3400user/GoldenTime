@@ -223,6 +223,56 @@ def personenart_of(record: SignalRecord) -> str:
     return ""
 
 
+# e.K./Einzelunternehmen-Namensmuster (Eingetragener Kaufmann = juristisch eine natürliche Person).
+# Fängt 'Müller Elektro e.K.' / 'Schmidt e. Kfm.' AUCH dann, wenn der market_actors-Join keine
+# PersonenArt liefert (Join-Ausfall) — die Rechtsform e.K. steht oft nur im Namen, nicht in der
+# (fehlenden) PersonenArt. Konservativ: verlangt 'e.' MIT Punkt, damit 'Eckert'/'Beckmann' nicht treffen.
+_EK_NAME = re.compile(r"\be\.\s?k(?:fm|fr)?\.?\b|einzelkaufm|einzelunternehm", re.IGNORECASE)
+
+
+def ist_natuerliche_person(record: SignalRecord) -> bool:
+    """Harte e.K./natürliche-Person-Erkennung für das qa-unabhängige Liefer-Gate (S0 · §0 · I7).
+
+    Liefert True, wenn der Record eine natürliche Person / e.K. ist — über DREI robuste Wege, damit
+    ein einzelner Ausfall den DSGVO-/Rechts-relevanten Fall NICHT durchrutschen lässt (Bisnode/UODO:
+    Resale von Register-Daten über Einzelgewerbetreibende löst die Art-14-Informationspflicht aus):
+      1. PersonenArt-Proxy (market_actors-Join) == 'natuerlich',
+      2. das additive ``FLAG_NATUERLICHE_PERSON`` aus ``enrich_and_qualify`` (Namensmuster/PersonenArt),
+      3. ein e.K.-/Einzelunternehmen-Namensmuster (greift auch ohne PersonenArt, Join-Ausfall).
+
+    Bewusst konservativ (lieber eine Firma fälschlich aus der Lieferung halten als eine e.K. ausliefern)
+    — die Grenze ist eine Rechts-Invariante (§0), keine Qualitäts-Heuristik. Greift ERST, wenn der
+    Politik-Schalter ``natuerliche_personen_freigegeben`` AUS ist (Default; bis Anwalts-Verdikt).
+    """
+    if personenart_of(record) == "natuerlich":
+        return True
+    if FLAG_NATUERLICHE_PERSON in record.flags:
+        return True
+    return bool(record.entity and _EK_NAME.search(record.entity))
+
+
+def ist_natuerliche_person_name(name: str | None) -> bool:
+    """e.K./Einzelunternehmen NUR am Namen erkennen — für dict-basierte Legacy-Pfade (cmd_leads),
+    die keinen SignalRecord mit PersonenArt-Proxy/Flags tragen."""
+    return bool(name and _EK_NAME.search(name))
+
+
+def partition_natuerliche(records: list, nat_frei: bool) -> tuple[list, list]:
+    """Der EINE e.K./§0-Choke-Point: teile SignalRecords in (behalten, gesperrt).
+
+    ``nat_frei=True`` (Politik-Schalter an, nach Anwalts-Freigabe) → alles behalten. Sonst werden
+    natürliche Personen / e.K. (``ist_natuerliche_person``) qa-unabhängig in ``gesperrt`` umgeleitet.
+    JEDER kundenfähige Funnel (run_region · cmd_signals · cmd_diff) MUSS diese Funktion durchlaufen,
+    damit kein neuer Funnel den I7-Hartfilter wieder vergisst (Refute HIGH: cmd_diff lief ungefiltert).
+    """
+    if nat_frei:
+        return list(records), []
+    behalten, gesperrt = [], []
+    for r in records:
+        (gesperrt if ist_natuerliche_person(r) else behalten).append(r)
+    return behalten, gesperrt
+
+
 def _join_market_actors(
     records: list[SignalRecord], con: sqlite3.Connection
 ) -> dict[str, sqlite3.Row]:
