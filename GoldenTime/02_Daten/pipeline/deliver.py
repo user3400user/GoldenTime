@@ -9,6 +9,7 @@ kennzeichnet T2 als BESTAND (einmalige Ausschöpfung) vs. T1/T4 als FLUSS (wiede
 from __future__ import annotations
 
 import datetime as dt
+import logging
 from dataclasses import dataclass, field
 
 from .control import metrics
@@ -29,6 +30,8 @@ TRIGGER_ART = {
 DL_DE = ("Datenbasis: Marktstammdatenregister (MaStR) der Bundesnetzagentur, Lizenz dl-de/by-2.0 "
          "(https://www.govdata.de/dl-de/by-2-0). Kein amtlicher Datensatz, keine Gewähr — "
          "abgeleitete Auswertung; Quelle: Bundesnetzagentur, Marktstammdatenregister.")
+
+log = logging.getLogger("pipeline.deliver")
 
 
 @dataclass
@@ -102,6 +105,12 @@ def run_region(con, qa_con, *, plz_prefixes, region, gebiet_id="", resolve=True,
         mastr_resolve.EvidenzResolver(cache_con=qa_con).resolve_records(
             b.lieferbar, cache_only=not resolve)
     _record_metrics(b, qa_con, trigger=trig)
+    # G17 Datenbruch-Erkennung: warnt VOR der Auslieferung, wenn die lieferbare Dichte 0 ist oder
+    # gegenüber der Trailing-Baseline einbricht (leere/eingebrochene Liste an Exklusiv-Kunden = Vertrauens-GAU).
+    if b.gebiet_id:
+        warn = metrics.anomaly_check(qa_con, gebiet=b.gebiet_id, trigger=trig, wert=len(b.lieferbar))
+        if warn:
+            log.warning(warn)
     return b
 
 

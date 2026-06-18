@@ -209,6 +209,14 @@ aus dem Quellcode vermuteten deutschen XSD-Namen waren over-thought — `inspect
     KäuferB 0 (Exklusivität); e.K.-gesperrt 0 (benannte nat. Pers. laufen ohnehin über QA-pending). T1/T4-Snapshot
     **vertagt** (MaStR-Download-Host `download.marktstammdatenregister.de` resettet aktiv — extern, nicht Code).
   - Lebende Loop-Artefakte: `Roadmap/{KONZEPT-LANDKARTE,LOOP-LOG,LOOP-METRICS}.md` (+ Briefing v3).
+- **LOOP-ENGINEERING Loop 1 „S3" (18.06., 345 Tests grün):** Korrektheits-/Sichtbarkeits-Leaks (letzte
+  M1-Gate-Code-Items). **G5** (`qa_gate.apply_qa`): asymmetrisches Re-Review — APPROVED + echte QA-Flag-
+  Obermenge → PENDING, rejected bleibt rejected, KEIN Fingerprint-Eingriff (`SELECT` holt jetzt
+  `flags_at_review`). **G17** (`metrics.anomaly_check` + in `run_region` verdrahtet, `log.warning`):
+  0 lieferbar / Einbruch < 50 % Trailing-Median (≥2 Vorwochen) → Datenbruch-Warnung VOR Auslieferung;
+  ohne Historie ehrlich None. Re-Score: Observability 2→3. Verbleibende M1-Code-Items: **keine** —
+  kritischer M1-Pfad = nur noch Anwalt (PT1) + Mensch-QA. Frische (Säule 3, T2-irrelevant) + volle
+  Diff-Anomalie → mit T1/T4 (M2/extern blockiert) vertagt.
 - `02_Daten/.venv/` — lokales venv (gitignored), **open-mastr 0.17.1** + Deps installiert
   (System-`python3` hat kein pip → via `get-pip.py` gebootstrappt, kein sudo).
 - **Phase 0 ABGESCHLOSSEN (16.06.):** `build-db` echter Lauf ✅ (Export-DB 8,6 GB, Download 1575 s), `inspect` ✅,

@@ -131,7 +131,7 @@ def apply_qa(record: SignalRecord, con: sqlite3.Connection) -> str:
     Siehe Modul-Docstring für die Statuslogik. Gibt den gesetzten Status zurück (= record.qa_status).
     """
     row = con.execute(
-        "SELECT status, fingerprint FROM qa_decision WHERE einheit_mastr_nr = ?",
+        "SELECT status, fingerprint, flags_at_review FROM qa_decision WHERE einheit_mastr_nr = ?",
         (record.einheit_mastr_nr,),
     ).fetchone()
 
@@ -157,6 +157,23 @@ def apply_qa(record: SignalRecord, con: sqlite3.Connection) -> str:
     # der market_actors-Namens-Join ausfällt oder ein Heuristik-Muster editiert/entfernt wird.
     fp = fingerprint(record)
     if row["fingerprint"] == fp:
+        # G5 (asymmetrisch, KEIN Fingerprint-Eingriff): der Fingerprint deckt Flags bewusst NICHT (D5).
+        # Ein zuvor APPROVED Lead, der seit dem Review einen NEUEN QA-Flag bekommen hat (echte Obermenge
+        # der QA-Flags zur Review-Zeit — z.B. neu als Verein/öffentlich erkannt), muss zurück in die QA.
+        # 'rejected' bleibt 'rejected' (kein Re-Review einer Ablehnung); Flags in fingerprint() zu nehmen
+        # würde dagegen einen rejected wieder lieferbar machen (R6, qa_gate.py:159) — darum hier separat.
+        if row["status"] == APPROVED:
+            alt_qa = set(parse_flags(row["flags_at_review"])) & QA_FLAGS
+            neu_qa = set(record.flags) & QA_FLAGS
+            if neu_qa > alt_qa:                 # echte Obermenge -> neuer QA-Flag aufgetaucht
+                con.execute(
+                    "UPDATE qa_decision SET status = ?, flags_at_review = ?, grund = NULL, "
+                    "entschieden_am = NULL WHERE einheit_mastr_nr = ?",
+                    (PENDING, "|".join(record.flags), record.einheit_mastr_nr),
+                )
+                con.commit()
+                record.qa_status = PENDING
+                return PENDING
         record.qa_status = row["status"]
         return row["status"]
 

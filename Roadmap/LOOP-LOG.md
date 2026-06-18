@@ -96,4 +96,38 @@ Geprüfte Alternativen für die erste Bau-Schleife:
 - **Mensch-QA-Durchlauf** der ~134 Pending vor dem Essen (auto_ok ≠ mensch-geprüft).
 - **Funnel-Unifizierung (G28):** cmd_signals/cmd_leads sind Export-/Analyst-Tools, kein committender Pfad — einziger committender Funnel ist run_region. Voll vereinheitlichen = M2.
 
-**Status Loop 0: ✅ ABGESCHLOSSEN — bereit für Merge nach `main` an der Schleifen-Grenze.**
+**Status Loop 0: ✅ ABGESCHLOSSEN — committet `e380410`, gepusht.**
+
+---
+
+## ZIEL-ABLEITUNG · Bau-Schleife Loop 1 (18.06.2026)
+
+### Ziel
+**Korrektheits- & Sichtbarkeits-Leaks vor der ersten Lieferung schließen (Sprint S3, M1-Gate): G5 + G17.**
+- **G5 (Korrektheit):** ein zuvor `APPROVED` Lead, der seit dem Review einen NEUEN QA-Flag bekommen hat (echte Obermenge von `flags_at_review`), muss zurück in die QA (`PENDING`). `rejected` bleibt `rejected`. Asymmetrisch in `apply_qa`, **kein** Fingerprint-Eingriff (würde R6-Design `qa_gate.py:159` brechen).
+- **G17 (Observability/Datenbruch):** Anomalie-Erkennung — ein Lauf mit **0 lieferbaren** (oder Einbruch unter Trailing-Baseline) warnt **vor** der Auslieferung; eine leere/eingebrochene Liste an einen Exklusiv-Kunden ist ohne Tracking unsichtbar (Zielbild: „Diff-Volumen = Herzschlag").
+
+### WARUM größte (baubare) Hebel-Lücke (über §4a + §4b)
+1. **§4a:** Observability ist die **niedrigste In-Scope-Dimension (2)** und im Zielbild **existenziell (5,0)** — „stiller Kollaps liefert leere Listen an zahlende Exklusiv-Kunden, katastrophal und ohne Tracking unsichtbar". G5 trifft Korrektheit (Ziel 5,0). Beide sind **die letzten Code-Items des M1-Gate** (Sprint §2: (3) G5, (4) Datenbruch sichtbar) neben Anwalt (Mensch) — USP (2), Backup (5), Mengen-Messung (7) sind in Loop 0 erledigt.
+2. **§4b/Refuter:** Käufer-Batterie „bekomme ich denselben Lead/eine leere Liste?" — G17 verhindert, dass ein gebrochener Wochenlauf still eine leere Liste an den Exklusiv-Kunden schickt (zerstört genau das Vertrauen, das das Produkt verkauft). G5 verhindert, dass ein nachträglich rot-geflaggter (z.B. als Verein erkannter) Betrieb ausgeliefert wird, den der Gründer früher freigegeben hatte.
+3. **Baubar JETZT** (anders als Säule 1/T1/T4 + die volle Diff-Anomalie = extern blockiert/M2): G5 + G17-light brauchen keine 2. Snapshot-Daten; reg_datum/QA-Infrastruktur existiert.
+
+### CHALLENGE (§1.4)
+- **A) Säule 1 (T1/T4-Kaufmoment):** größter Markt-Hebel, aber **extern blockiert** (MaStR-Download) → nicht baubar.
+- **B) Frische sichtbar (Säule 3, S3/G2):** markt-validiert, aber für das **T2-BESTAND**-Produkt (Kunde #1) **irrelevant** (Post-EEG-Leads von 2006/07 sind kein Frische-Signal; Sprint-Plan PT1-Branch sagt das explizit). Voller Wert erst mit T1-FLUSS → mit Säule 1 vertagt.
+- **C) Volle Diff-Anomalie / Trailing-Baseline:** braucht ≥2–3 Wochen Metrik-Historie (haben wir nicht) → G17-light (0/Einbruch-Warnung) jetzt, volle Baseline wenn Historie da ist (M2).
+- **Begründung:** G5+G17 sind die einzigen M1-Gate-Code-Items, die baubar UND nicht extern gated sind, und treffen die zwei existenziellsten Scorecard-Dimensionen.
+
+### Invarianten-Check / Exits
+- **I1** Tests grün; **I4** Ehrlichkeit (Anomalie warnt, fälscht nichts; G5 macht die QA strenger, nicht lockerer).
+- **Exits:** zuvor approved + NEU geflaggt (ohne load-bearing-Änderung) → `PENDING`; zuvor `rejected` bleibt `rejected`; Lauf mit 0 lieferbaren → `WARNING`; Einbruch < 50 % Trailing-Median (mit Historie) → `WARNING`. Echtdaten-Lauf zeigt keine Falsch-Anomalie auf den Demo-Gebieten.
+
+### Durchführung + Closeout (18.06.2026) — ABGESCHLOSSEN
+- **G5** (`qa_gate.apply_qa`): asymmetrisches Re-Review — `APPROVED` + echte QA-Flag-Obermenge → `PENDING`; `rejected` bleibt `rejected`; Teilmenge ändert nichts; **kein** Fingerprint-Eingriff (Bugfix: `SELECT` holt jetzt auch `flags_at_review`).
+- **G17** (`metrics.anomaly_check` + `run_region`): 0 lieferbar → harte Warnung; Einbruch < 50 % Trailing-Median (≥2 Vorwochen) → Warnung; ohne Historie ehrlich None. Verdrahtet in `run_region` (loggt `log.warning` vor Auslieferung).
+- **Refuter = adversariale Tests** (8 neue, Edge-Cases: rejected-bleibt-rejected · Flag-entfernt-bleibt-approved · keine-Historie-keine-Warnung). **345 Tests grün.**
+- **Echtdaten:** gate-demo Münsterland/Osnabrück (41/48) → **keine** Falsch-Anomalie; leere Region (PLZ 99998, 0 lieferbar) → Warnung feuert korrekt.
+- **Re-Score (Beleg):** Dim 5 **Observability 2→3** (Datenbruch warnt vor Auslieferung statt still leere Liste an Exklusiv-Kunden; Baseline-Infra gebaut, voll wirksam mit Wochen-Historie). Dim 2 **Korrektheit 4** (gehärtet: approved-dann-neu-geflaggt-Leck zu).
+- **Vertagt:** Frische sichtbar (Säule 3) — T2-irrelevant, mit Säule 1/T1 vertagt. Volle Trailing-Baseline-Anomalie + per-Trigger-Diff-Metriken → M2 (brauchen FLUSS + Historie).
+
+**Status Loop 1: ✅ ABGESCHLOSSEN.** Verbleibende M1-Gate-Code-Items: keine (USP ✓, Backup ✓, Mengen ✓, G5 ✓, G17 ✓); **kritischer M1-Pfad = nur noch Anwalt (PT1, Mensch) + Mensch-QA-Durchlauf**.
