@@ -153,3 +153,13 @@ Geprüfte Alternativen für die erste Bau-Schleife:
 - **Re-Score (Beleg):** **UX 2→4** (sauberes, sicheres Kundenportal mit Login + Mandanten-Trennung + Provenance 1-Klick + Demo-Banner — trifft die Zielbild-Merkmale; nur der volle Cockpit-Ausbau fehlt zu 4,5). Funktionsumfang eff.3→3,5 (verkaufbares Asset DoD §9.4). Infra-Sicherheit gehärtet (Auth/Session, security-reviewed). **DoD §9.4 erfüllt.**
 
 **Status Loop 3: ✅ ABGESCHLOSSEN.**
+
+---
+
+## Loop 4 · CI-Gate grün (DoD §9.5) — ABGESCHLOSSEN (18.06.)
+**Ziel-Ableitung (§1.1):** Klarster verbleibender DoD-§9-Gap = **„CI grün; getesteter Restore" (§9.5)** — Restore steht (Loop 2), CI fehlte. Trifft die niedrige Dimension **Wartbarkeit/Codequalität (3)** (Zielbild 4,5: „volle Typ-Abdeckung + Gate"). **Kalibrierung (nicht über-engineeren):** ein **leanes** Gate (ruff + mypy-**lenient** + pytest-cov + Lockfile), genau wie der Sprint-Plan es für M2 spezifiziert — vorgezogen per Gründer-Direktive „top-tier DoD".
+- **Gebaut:** `pyproject.toml` (ruff/mypy/coverage-Config, pragmatischer Regelsatz) · **ruff clean** (70 Findings: 44 auto-fix + 8 Produktions-Fixes echt behoben [B904/SIM108/UP031/E501], Tests/HTML per-file gelockert) · **mypy clean** (lenient; alle 17 „False Positives" der Standortbestimmung **echt gefixt** — Annotationen/Walrus/Signaturen, kein Blind-Ignore) · **`uv.lock` + `requirements.lock`** (G31 Rebuild-Sicherheit, 46 Pakete) · **`.github/workflows/ci.yml`** (ruff→mypy→Tests→Coverage `--fail-under=70`, ohne open-mastr da stdlib-Tests) · `.gitignore` um Tool-Caches/`.coverage` ergänzt.
+- **Verifikation (Gate exakt lokal):** ruff ✓ · mypy „no issues" ✓ · **366 Tests grün** · Coverage **79 %** (> 70 %-Gate). Tests nach jedem Auto-Fix/Typ-Fix grün geblieben (I1).
+- **Re-Score (Beleg):** **Wartbarkeit/Codequalität 3→4** (ruff+mypy-Gate grün + Lockfile + CI; nur volle strict-Typisierung fehlt zu 4,5). Betriebsreife 3→3,5 (CI/Lockfile).
+
+**Status Loop 4: ✅ ABGESCHLOSSEN.**

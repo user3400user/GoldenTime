@@ -8,7 +8,7 @@ in die Pipeline-Logik — importiert nur ``control`` + ``ledger`` (Briefing §6,
   views — reine Render-Funktionen (HTML, ohne Server testbar): ``render_dashboard``
   app   — HTTP-Hülle (``serve``) + Schalter-Mutation (``apply_toggle``)
 """
-from .views import render_dashboard
 from .app import apply_toggle, gather_view_data, serve
+from .views import render_dashboard
 
 __all__ = ["render_dashboard", "apply_toggle", "gather_view_data", "serve"]

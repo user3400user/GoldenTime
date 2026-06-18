@@ -267,7 +267,8 @@ def partition_natuerliche(records: list, nat_frei: bool) -> tuple[list, list]:
     """
     if nat_frei:
         return list(records), []
-    behalten, gesperrt = [], []
+    behalten: list = []
+    gesperrt: list = []
     for r in records:
         (gesperrt if ist_natuerliche_person(r) else behalten).append(r)
     return behalten, gesperrt

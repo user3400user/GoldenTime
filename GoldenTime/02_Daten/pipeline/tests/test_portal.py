@@ -25,7 +25,9 @@ from unittest import mock
 
 from pipeline import config as pconfig
 from pipeline.control import state as statemod
-from pipeline.portal import app as portalapp, auth as pauth, seed as pseed
+from pipeline.portal import app as portalapp
+from pipeline.portal import auth as pauth
+from pipeline.portal import seed as pseed
 
 
 def _seed(con):

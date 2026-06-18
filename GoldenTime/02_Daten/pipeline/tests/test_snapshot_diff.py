@@ -19,7 +19,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-import pipeline.snapshot.diff as diffmod   # Submodul explizit (Paket-Attr 'diff' = re-exportierte Funktion)
+import pipeline.snapshot.diff as diffmod  # Submodul explizit (Paket-Attr 'diff' = re-exportierte Funktion)
 from pipeline.snapshot import rules, store
 from pipeline.snapshot.store import SNAPSHOT_FIELDS
 

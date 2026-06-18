@@ -9,6 +9,11 @@ push.sh
 __pycache__/
 *.pyc
 .venv/
+.ruff_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+02_Daten/backups/
 # Build-/Pipeline-Artefakte (lokal, nicht committen)
 *.log
 *.db

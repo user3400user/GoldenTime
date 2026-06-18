@@ -231,7 +231,7 @@ def save(store: ConfigStore, *, updated_by: str = "dashboard",
          path: Path | str | None = None, _now: str | None = None) -> ConfigStore:
     """Atomar schreiben (nur vom Dashboard). os.replace → Reader sieht nie eine halbe Datei."""
     p = Path(path or config.CONFIG_STORE_PATH)
-    now = _now or dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
+    now = _now or dt.datetime.now(dt.UTC).isoformat(timespec="seconds")
     # extras (u.a. der invarianten-tragende policy-Block) MUSS durchgereicht werden — sonst löscht
     # jeder Dashboard-Toggle die natuerliche_personen_freigegeben-Freigabe + den Audit-Kommentar
     # still (Refute MEDIUM: fail-safe zwar re-locked, aber ein realer Operability-Defekt).

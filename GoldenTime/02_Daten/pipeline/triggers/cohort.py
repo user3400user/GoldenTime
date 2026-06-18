@@ -25,7 +25,7 @@ from __future__ import annotations
 import datetime as dt
 import logging
 import sqlite3
-from typing import Iterable, Iterator
+from collections.abc import Iterable, Iterator
 
 from .. import config
 from .. import db as dbmod
@@ -203,7 +203,7 @@ def cohort_signals(
             "einspeisung": r.get("einspeisung"),
             "reg_datum": reg.isoformat() if reg else None,
             # Datum = maßgebliche EEG-Inbetriebnahme (Förderende-Bezug), sonst Einheiten-IBN.
-            "inbetriebnahme": (eeg_ibn or ibn).isoformat() if (eeg_ibn or ibn) else None,
+            "inbetriebnahme": ibn_eff.isoformat() if (ibn_eff := (eeg_ibn or ibn)) else None,
             "speicher_status": status,
             "speicher_label": LABEL[status],
             "trigger_typ": TRIGGER_KEY,

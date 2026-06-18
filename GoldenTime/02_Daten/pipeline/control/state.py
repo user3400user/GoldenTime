@@ -162,10 +162,8 @@ def backup_state_db(db_path: Path | str | None = None,
     stamp = dt.datetime.now().strftime("%Y%m%dT%H%M%S")
     dest = bdir / f"pipeline_state_{stamp}.db"
     # Read-only-Quelle, falls vorhanden (sonst leere DB anlegen → leeres, valides Backup).
-    if src_path.exists():
-        src = sqlite3.connect(f"file:{src_path}?mode=ro", uri=True)
-    else:
-        src = sqlite3.connect(str(src_path))
+    src = (sqlite3.connect(f"file:{src_path}?mode=ro", uri=True) if src_path.exists()
+           else sqlite3.connect(str(src_path)))
     dst = sqlite3.connect(str(dest))
     try:
         with dst:

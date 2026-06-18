@@ -82,7 +82,7 @@ def render_leads(kunde: sqlite3.Row, leads: list[sqlite3.Row], *, csrf: str = ""
     if leads:
         zeilen = "".join(
             f"<tr><td><a href='/lead/{e(r['see'])}'>{e(r['entity'] or '—')}</a></td>"
-            f"<td>{('%.0f' % r['kwp']) if r['kwp'] is not None else '—'} kWp</td>"
+            f"<td>{format(r['kwp'], '.0f') if r['kwp'] is not None else '—'} kWp</td>"
             f"<td>{e(r['plz'] or '')} {e(r['ort'] or '')}</td>"
             f"<td><span class=pill>{e(r['trigger'] or 'T2')}</span></td>"
             f"<td>{'<a href=\"'+e(r['evidenz_url'])+'\" target=_blank rel=noopener>MaStR ↗</a>' if r['evidenz_url'] else '—'}</td></tr>"
@@ -115,7 +115,7 @@ def render_lead(kunde: sqlite3.Row, r: sqlite3.Row, *, csrf: str = "", demo: boo
         f'<div style="display:flex;align-items:baseline;justify-content:space-between">'
         f'<h2 style="margin:0"><a href="/" class=muted>&larr;</a> {e(r["entity"] or "—")}</h2>{logout}</div>'
         f'<div class=card style="margin-top:14px"><dl class=kv>'
-        f'<dt>Leistung</dt><dd>{("%.0f" % r["kwp"]) if r["kwp"] is not None else "—"} kWp</dd>'
+        f'<dt>Leistung</dt><dd>{format(r["kwp"], ".0f") if r["kwp"] is not None else "—"} kWp</dd>'
         f'<dt>Ort</dt><dd>{e(r["plz"] or "")} {e(r["ort"] or "")}</dd>'
         f'<dt>Kaufanlass</dt><dd><span class=pill>{e(r["trigger"] or "T2")}</span></dd>'
         f'<dt>Inbetriebnahme</dt><dd>{e(r["datum"] or "—")}</dd>'

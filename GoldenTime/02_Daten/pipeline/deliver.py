@@ -173,8 +173,10 @@ def liefer_mail(b: Buckets, *, kaeufer: str = "", funktion: str = "Speicher-Inst
     ]
     for i, r in enumerate(zeilen, 1):
         dv = " [DV-pflichtig ≥100 kWp]" if r.dv_flag else ""
-        L.append(f"{i:2d}. {r.entity}  ·  {(r.kwp or 0):.0f} kWp  ·  {r.plz or '?????'} {r.ort or ''}  ·  {r.trigger_typ}{dv}")
-        L.append(f"    Konfidenz {r.konfidenz} (grob, nicht kalibriert) · {r.speicher_label} · Inbetriebnahme {r.datum or '—'}")
+        L.append(f"{i:2d}. {r.entity}  ·  {(r.kwp or 0):.0f} kWp  ·  {r.plz or '?????'} {r.ort or ''}"
+                 f"  ·  {r.trigger_typ}{dv}")
+        L.append(f"    Konfidenz {r.konfidenz} (grob, nicht kalibriert) · {r.speicher_label}"
+                 f" · Inbetriebnahme {r.datum or '—'}")
         gr = getattr(r, "konfidenz_gruende", None)
         gr_txt = " · ".join(str(g) for g in gr) if isinstance(gr, (list, tuple)) else str(gr or "")
         if gr_txt:

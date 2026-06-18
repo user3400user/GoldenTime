@@ -31,7 +31,7 @@ SESSION_TTL_STUNDEN = 12
 
 
 def _now() -> dt.datetime:
-    return dt.datetime.now(dt.timezone.utc)
+    return dt.datetime.now(dt.UTC)
 
 
 def hash_password(password: str, salt_hex: str | None = None) -> tuple[str, str]:
@@ -66,7 +66,7 @@ def create_customer(con: sqlite3.Connection, *, login: str, password: str, name:
         (login.strip().lower(), name, h, salt, gebiet, funktion, _now().isoformat(timespec="seconds")),
     )
     con.commit()
-    return int(cur.lastrowid)
+    return int(cur.lastrowid or 0)   # nach erfolgreichem INSERT immer gesetzt (or 0 nur für den Typ)
 
 
 def authenticate(con: sqlite3.Connection, login: str, password: str) -> sqlite3.Row | None:

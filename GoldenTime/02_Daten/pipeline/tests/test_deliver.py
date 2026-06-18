@@ -89,6 +89,7 @@ class TestResolverCacheOnly(unittest.TestCase):
         # R4 (--offline): gecachte Direktlinks anwenden, bei Miss None — NIE eine Session öffnen.
         import pathlib
         import tempfile
+
         from pipeline.control import state
         from pipeline.enrich.mastr_resolve import EvidenzResolver
         with tempfile.TemporaryDirectory() as d:
@@ -108,6 +109,7 @@ class TestRecordMetrics(unittest.TestCase):
         # R4: run_region/_record_metrics speist das Dashboard-Monitoring (idempotent).
         import pathlib
         import tempfile
+
         from pipeline import deliver as D
         from pipeline.control import metrics, state
         with tempfile.TemporaryDirectory() as d:

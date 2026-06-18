@@ -8,11 +8,9 @@ Lauf (aus 02_Daten/):  python -m unittest pipeline.tests.test_signal_record
 """
 from __future__ import annotations
 
-import datetime as dt
 import unittest
 
-from pipeline import config
-from pipeline.signal import SignalRecord, compute_konfidenz, from_lead, mastr_einheit_url
+from pipeline.signal import SignalRecord, compute_konfidenz, from_lead
 from pipeline.signal.record import KONF_MIN
 
 

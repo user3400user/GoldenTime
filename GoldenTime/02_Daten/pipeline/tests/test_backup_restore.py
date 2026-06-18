@@ -61,9 +61,8 @@ class TestBackupRestore(unittest.TestCase):
             self.assertEqual(live.read_text(), "ORIGINAL")
 
     def test_restore_fehlt_backup(self):
-        with tempfile.TemporaryDirectory() as d:
-            with self.assertRaises(FileNotFoundError):
-                statemod.restore_state_db(Path(d) / "gibtsnicht.db", db_path=Path(d) / "x.db")
+        with tempfile.TemporaryDirectory() as d, self.assertRaises(FileNotFoundError):
+            statemod.restore_state_db(Path(d) / "gibtsnicht.db", db_path=Path(d) / "x.db")
 
     def test_list_backups_neueste_zuerst(self):
         with tempfile.TemporaryDirectory() as d:

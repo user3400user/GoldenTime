@@ -18,9 +18,9 @@ bei <~9 Mio. schlanken Zeilen ist das in-memory handhabbar (vgl. speicher_check-
 from __future__ import annotations
 
 import sqlite3
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterator
 
 # Change-Types
 NEW_UNIT = "NEW_UNIT"

@@ -14,7 +14,8 @@ EEG-Inbetriebnahmejahr) und wird darum als freie Funktion in ``cohort.py`` ausge
 from __future__ import annotations
 
 import sqlite3
-from typing import Iterator, Protocol, runtime_checkable
+from collections.abc import Iterator
+from typing import Protocol, runtime_checkable
 
 from ..signal import SignalRecord
 from ..speicher_check import StorageIndex

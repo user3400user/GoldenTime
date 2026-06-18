@@ -27,7 +27,7 @@ from __future__ import annotations
 #   from pipeline.snapshot import store, diff, rules
 #   from pipeline.snapshot.diff import DiffEvent, diff
 #   from pipeline.snapshot.rules import classify_diff, PrevIndex
-from . import diff, rules, store          # noqa: F401  (Submodule verfügbar machen)
+from . import diff, rules, store  # noqa: F401  (Submodule verfügbar machen)
 from .diff import DiffEvent
 from .rules import PrevIndex, classify_diff
 from .store import (

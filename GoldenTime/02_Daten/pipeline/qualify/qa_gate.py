@@ -232,7 +232,7 @@ def approve_abr(con: sqlite3.Connection, abr: str, grund: str | None = None,
     return cur.rowcount
 
 
-def list_queue(con: sqlite3.Connection, *, status: str = PENDING,
+def list_queue(con: sqlite3.Connection, *, status: str | None = PENDING,
                limit: int | None = None) -> list[sqlite3.Row]:
     """Die QA-Queue lesen (Default: offene 'pending'-Fälle), neueste zuerst.
 

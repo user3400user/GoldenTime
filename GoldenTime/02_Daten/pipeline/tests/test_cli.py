@@ -29,11 +29,10 @@ from pathlib import Path
 from unittest import mock
 
 from pipeline import cli
-from pipeline.control import state as statemod
 from pipeline.control import config_store as cs
+from pipeline.control import state as statemod
 from pipeline.qualify import qa_gate
 from pipeline.signal import SignalRecord
-
 
 # --------------------------------------------------------------------------- #
 # Synthetische open-mastr-artige Quell-DB (vgl. test_snapshot_diff / test_cohort).

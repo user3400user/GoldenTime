@@ -13,7 +13,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from pipeline.control import metrics, state as statemod
+from pipeline.control import metrics
+from pipeline.control import state as statemod
 from pipeline.qualify import qa_gate
 from pipeline.signal import SignalRecord
 

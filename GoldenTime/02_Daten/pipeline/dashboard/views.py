@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import html
 
-from ..control.config_store import ConfigStore, VALID_MODULES, VALID_TRIGGERS
+from ..control.config_store import VALID_MODULES, VALID_TRIGGERS, ConfigStore
 
 # Inline-CSS — schlank, keine externen Dateien (Dashboard läuft offline/intern).
 _CSS = """

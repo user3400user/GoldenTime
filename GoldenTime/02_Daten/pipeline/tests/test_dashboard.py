@@ -20,8 +20,7 @@ from pathlib import Path
 
 from pipeline import ledger
 from pipeline.control import config_store as cs
-from pipeline.control import metrics
-from pipeline.control import state
+from pipeline.control import metrics, state
 from pipeline.dashboard import app, views
 
 DEFAULT_STORE = cs.load(Path("/nonexistent/config_store.json"))  # eingebaute Defaults

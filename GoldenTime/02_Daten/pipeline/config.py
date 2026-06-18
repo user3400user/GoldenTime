@@ -74,7 +74,7 @@ COL: dict[str, tuple[str, ...]] = {
     "einheit_nr": ("EinheitMastrNummer",),
     "abr": ("AnlagenbetreiberMastrNummer",),
     "lokation_nr": ("LokationMaStRNummer", "LokationMastrNummer"),
-    "betreiber_name": ("AnlagenbetreiberName", "Anlagenbetreiber"),  # Phase 0: NICHT im Export auf der Einheit -> via firmenname (market_actors)
+    "betreiber_name": ("AnlagenbetreiberName", "Anlagenbetreiber"),  # P0: nicht auf Einheit -> market_actors.firmenname
     "personenart": ("Personenart", "AnlagenbetreiberPersonenArt"),   # Phase 0: nur auf market_actors
     "plz": ("Postleitzahl",),
     "ort": ("Ort",),

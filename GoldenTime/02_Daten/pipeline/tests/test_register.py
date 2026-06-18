@@ -17,16 +17,16 @@ from __future__ import annotations
 import sqlite3
 import unittest
 
+from pipeline.adapters.mastr import MastrAdapter
 from pipeline.register import (
     ET_SOLAR,
     ET_SPEICHER,
+    REGISTERS,
     NormalizedUnit,
     RegisterAdapter,
-    REGISTERS,
     SchemaMap,
     Standort,
 )
-from pipeline.adapters.mastr import MastrAdapter
 
 # Synthetisches Schema wie in test_speicher_abr.py (reale *_extended-Spaltennamen).
 SOLAR_COLS = [

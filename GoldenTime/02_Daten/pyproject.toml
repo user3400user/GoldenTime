@@ -1,0 +1,50 @@
+[project]
+name = "goldentime-pipeline"
+version = "0.4.0"
+description = "GoldenTime — MaStR-Lead-Pipeline (Gewerbespeicher-Kaufsignale, Vollpaket + Kundenportal)"
+requires-python = ">=3.12"
+# Einzige schwere Laufzeit-Dep (stdlib-first); nur für den echten open-mastr-Export nötig.
+dependencies = ["open-mastr==0.17.1"]
+
+[project.optional-dependencies]
+dev = ["ruff>=0.15", "mypy>=1.15", "coverage>=7.6"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+extend-exclude = [".venv", "snapshots", "backups", "build", "dist"]
+
+[tool.ruff.lint]
+# Pragmatischer, wertvoller Regelsatz (kein over-pedantic): Fehler/Flakes, Imports, Bugbear,
+# Comprehensions, Pyupgrade, Vereinfachungen. Bewusst NICHT die Doc-/Annotation-Pedanten.
+select = ["E", "F", "W", "I", "UP", "B", "C4", "SIM"]
+ignore = [
+    "B008",   # Funktionsaufruf im Default-Arg — bei uns bewusst (config.OPENMASTR_DATA etc.)
+    "SIM105", # contextlib.suppress vs. try/except — beides ok, nicht erzwingen
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests dürfen lockerer sein (Hilfs-Imports/-Variablen, lange Daten-/Assert-Zeilen, blind-Exception in Negativtests).
+"pipeline/tests/*" = ["E402", "F841", "E501", "E741", "C408", "B017"]
+# HTML/CSS-Strings sind naturgemäß lang — E501 hier nicht erzwingen (Lesbarkeit der Templates).
+"pipeline/portal/views.py" = ["E501"]
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true        # open-mastr ohne Type-Stubs
+warn_unused_ignores = false
+warn_return_any = false
+check_untyped_defs = false
+# Lenient (Sprint-Plan/Zielbild): grobe Fehler fangen, KEIN strict — Over-Engineering pre-revenue.
+exclude = ['(^|/)tests/', '(^|/)\.venv/']
+
+[tool.coverage.run]
+source = ["pipeline"]
+omit = ["pipeline/tests/*", "*/__pycache__/*"]
+
+[tool.coverage.report]
+show_missing = false
+skip_covered = false
+
+[tool.uv]
+package = false

@@ -232,7 +232,13 @@ aus dem Quellcode vermuteten deutschen XSD-Namen waren over-thought — `inspect
   `portal_session`/`portal_lead`. CLI: `portal serve/seed-demo/add-customer`. **Security-Engineer-Review:
   kein CRITICAL** (kein SQLi/IDOR/XSS/§0-Leck); 1 HIGH + MEDIUMs gefixt. 17 Portal-Tests (Auth, Mandanten,
   HTTP-Flow inkl. cross-Mandant-404, CSRF, §0-Filter). Re-Score: UX 2→4.
-- `02_Daten/.venv/` — lokales venv (gitignored), **open-mastr 0.17.1** + Deps installiert
+- **LOOP-ENGINEERING Loop 4 „CI" (18.06., DoD §9.5):** leanes CI-Gate grün. `pyproject.toml`
+  (ruff+mypy-lenient+coverage), **ruff clean** + **mypy „no issues"** (alle 17 Standortbestimmung-
+  „False Positives" echt gefixt: Annotationen/Walrus/Signaturen), `uv.lock`+`requirements.lock` (G31),
+  `.github/workflows/ci.yml` (ruff→mypy→Tests→Coverage `--fail-under=70`, ohne open-mastr da
+  stdlib-Tests). 366 Tests grün, Coverage 79 %. Re-Score: Wartbarkeit 3→4. **Gate lokal:**
+  `cd 02_Daten && .venv/bin/ruff check pipeline/ && .venv/bin/mypy pipeline/ && .venv/bin/coverage run -m unittest discover -s pipeline/tests -p "test_*.py"`.
+- `02_Daten/.venv/` — lokales venv (gitignored), **open-mastr 0.17.1** + Deps installiert (+ dev: ruff/mypy/coverage)
   (System-`python3` hat kein pip → via `get-pip.py` gebootstrappt, kein sudo).
 - **Phase 0 ABGESCHLOSSEN (16.06.):** `build-db` echter Lauf ✅ (Export-DB 8,6 GB, Download 1575 s), `inspect` ✅,
   `config.py` empirisch verifiziert+korrigiert ✅, 9/9 Tests grün, realer `leads`-Lauf validiert die Pipeline.

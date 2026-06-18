@@ -21,21 +21,19 @@ import sys
 from collections import Counter
 from pathlib import Path
 
-from . import config
+from . import config, deliver, export_adapter
 from . import db as dbmod
-from . import export_adapter
-from .normalize import iter_leads
-from .speicher_check import GEPLANT, build_storage_index
-from .signal import SignalRecord, mastr_detail_url, mastr_suchlink
-from .triggers import cohort, diff_based
-from .qualify import hierarchy, qa_gate
-from .snapshot import store as snapstore
-from .ledger import ledger as ledgermod
 from .control import config_store as cs
-from .control import state as statemod
 from .control import metrics as metricsmod
+from .control import state as statemod
 from .enrich import mastr_resolve
-from . import deliver
+from .ledger import ledger as ledgermod
+from .normalize import iter_leads
+from .qualify import hierarchy, qa_gate
+from .signal import SignalRecord, mastr_detail_url, mastr_suchlink
+from .snapshot import store as snapstore
+from .speicher_check import GEPLANT, build_storage_index
+from .triggers import cohort, diff_based
 
 log = logging.getLogger("pipeline")
 
@@ -390,7 +388,8 @@ def cmd_ledger(args: argparse.Namespace) -> int:
         rows = ledgermod.overview(con)
         print(f"Exklusivität ({len(rows)} aktive Reservierungen):")
         for r in rows:
-            print(f"  {r['funktion']:22s} {r['gebiet']:14s} {r['trigger']:6s} -> {r['kaeufer']}  ({r['reserviert_am']})")
+            print(f"  {r['funktion']:22s} {r['gebiet']:14s} {r['trigger']:6s} -> {r['kaeufer']}  "
+                  f"({r['reserviert_am']})")
     elif args.action == "reserve":
         ok = ledgermod.reserve(con, args.funktion, args.gebiet, args.trigger, args.kaeufer)
         print(f"reserve {args.funktion}×{args.gebiet}×{args.trigger} -> {args.kaeufer}: "
@@ -415,8 +414,8 @@ def cmd_evidenz_check(args: argparse.Namespace) -> int:
     store = cs.load()
     if args.plz:
         prefixes = _plz_prefixes(args.plz)
-    elif args.gebiet and store.gebiet(args.gebiet):
-        prefixes = tuple(store.gebiet(args.gebiet).get("plz_prefixes", ()))
+    elif args.gebiet and (g := store.gebiet(args.gebiet)):
+        prefixes = tuple(g.get("plz_prefixes", ()))
     else:
         raise SystemExit("Bitte --gebiet <id> oder --plz <präfixe> angeben.")
     con = dbmod.connect(args.db)
@@ -671,7 +670,9 @@ def cmd_restore(args: argparse.Namespace) -> int:
 
 def cmd_portal(args: argparse.Namespace) -> int:
     """Kundenportal (DoD §9.4): serve / seed-demo / add-customer. Läuft auf Sample-Daten; LIVE aus → Demo."""
-    from .portal import app as portalapp, auth as pauth, seed as pseed
+    from .portal import app as portalapp
+    from .portal import auth as pauth
+    from .portal import seed as pseed
     if args.action == "serve":
         if config.LIVE_DELIVERY_ENABLED:
             print("HINWEIS: LIVE_DELIVERY_ENABLED ist AN — das Portal zeigt KEINE Demo-Kennzeichnung mehr.")
@@ -691,7 +692,7 @@ def cmd_portal(args: argparse.Namespace) -> int:
                 cid = pauth.create_customer(con, login=args.login, password=pw, name=args.name or args.login,
                                             gebiet=args.gebiet, funktion=args.funktion or "speicher_installateur")
             except sqlite3.IntegrityError:
-                raise SystemExit(f"Login '{args.login}' existiert bereits.")
+                raise SystemExit(f"Login '{args.login}' existiert bereits.") from None
             print(f"Kunde #{cid} angelegt: login={args.login.strip().lower()} · gebiet={args.gebiet}")
             if not args.password:
                 print(f"  generiertes Passwort: {pw}   (JETZT notieren — wird nicht erneut angezeigt)")

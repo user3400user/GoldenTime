@@ -13,14 +13,12 @@ downstream (sie konsumieren ``NormalizedUnit.raw`` weiter). So bleibt das Interf
 from __future__ import annotations
 
 import sqlite3
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Iterator
 
-from .. import config
+from .. import config, export_adapter
 from .. import db as dbmod
-from .. import export_adapter
 from ..register import (
-    ET_EV_LADEPUNKT,
     ET_SOLAR,
     ET_SPEICHER,
     NormalizedUnit,
@@ -66,7 +64,7 @@ class MastrAdapter:
     key = "mastr"
     label = "MaStR Gesamtdatenexport"
 
-    def build_db(self, *, data: object = None, engine: str = "sqlite") -> Path:
+    def build_db(self, *, data: tuple[str, ...] | None = None, engine: str = "sqlite") -> Path:
         """Lädt den Export via open-mastr (delegiert an export_adapter.build_db)."""
         objekte = tuple(data) if data is not None else config.OPENMASTR_DATA
         return export_adapter.build_db(data=objekte, engine=engine)
@@ -165,7 +163,7 @@ class MastrAdapter:
         for row in con.execute(sql, params):
             r = dict(row)
             yield NormalizedUnit(
-                einheit_id=r.get("einheit_nr"),
+                einheit_id=r.get("einheit_nr") or "",
                 betreiber_id=r.get("abr"),
                 lokation_id=r.get("lokation_nr"),
                 standort=Standort(

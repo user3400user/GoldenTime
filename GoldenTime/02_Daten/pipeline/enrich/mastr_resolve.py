@@ -17,6 +17,7 @@ from __future__ import annotations
 import datetime as dt
 import logging
 import time
+from typing import Any
 
 log = logging.getLogger(__name__)
 
@@ -80,7 +81,7 @@ class EvidenzResolver:
                 self._cache_con.execute(
                     "INSERT OR REPLACE INTO mastr_url_cache(einheit_mastr_nr, detail_id, resolved_at) "
                     "VALUES(?, ?, ?)",
-                    (see, int(detail_id), dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")))
+                    (see, int(detail_id), dt.datetime.now(dt.UTC).isoformat(timespec="seconds")))
                 self._cache_con.commit()
             except Exception as e:   # DB locked/zu/voll -> Lauf NICHT abbrechen (Docstring-Vertrag, R0-Härtung)
                 log.debug("Cache-Schreiben für %s fehlgeschlagen: %s", see, e)
@@ -123,7 +124,8 @@ class EvidenzResolver:
         """
         n = 0
         for r in records:
-            mid = self.resolve_id(getattr(r, "einheit_mastr_nr", None), cache_only=cache_only)
+            see = getattr(r, "einheit_mastr_nr", None)
+            mid = self.resolve_id(see, cache_only=cache_only) if see else None
             if mid:
                 r.detail_id = mid
                 n += 1
@@ -136,7 +138,7 @@ def validate_urls(records, *, sample: int = 10, timeout: float = 20.0) -> dict:
     Prüft bis zu ``sample`` Record-URLs auf HTTP 200. Reine Verifikation (keine Mutation). Bei
     fehlendem ``requests`` wird ``geprüft=0`` zurückgegeben (offen kommuniziert, nicht vorgetäuscht).
     """
-    out = {"ok": 0, "fehler": 0, "geprueft": 0, "details": []}
+    out: dict[str, Any] = {"ok": 0, "fehler": 0, "geprueft": 0, "details": []}
     try:
         import requests
     except Exception:
@@ -144,6 +146,7 @@ def validate_urls(records, *, sample: int = 10, timeout: float = 20.0) -> dict:
         return out
     for r in records[:sample]:
         url = r.evidenz_url
+        code: int | str
         try:
             code = requests.get(url, headers={"User-Agent": _UA}, timeout=timeout).status_code
         except Exception as e:

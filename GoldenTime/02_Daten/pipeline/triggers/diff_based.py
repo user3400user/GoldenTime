@@ -33,16 +33,15 @@ from __future__ import annotations
 import datetime as dt
 import logging
 import sqlite3
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Iterator
 
-from .. import config
 from .. import db as dbmod
 from ..signal import SignalRecord, compute_konfidenz
 from ..signal.record import BUY_RELEVANZ, is_dv_pflichtig
-from ..speicher_check import NONE_REPORTED
 from ..snapshot import diff as diffmod
 from ..snapshot import rules as rulesmod
+from ..speicher_check import NONE_REPORTED
 
 log = logging.getLogger(__name__)
 
@@ -162,6 +161,7 @@ def _build_record(
     if is_t4:
         kwp = None
     # Maßgebliches Datum: bei T6 das auslösende Stilllegungsdatum (ev.new), sonst Inbetriebnahme.
+    datum: str | None
     if trigger_key == rulesmod.T6 and ev.new is not None:
         datum = str(ev.new)[:10]
     else:
@@ -171,8 +171,8 @@ def _build_record(
     # (sonst widersprüchlicher Grund 'kein Speicher gemeldet' + falscher 0.10-Abschlag + falscher
     # QA-Fingerprint-Seed). none_reported nur für T1/T5/T6/PV_ERW (solar ohne gemeldeten Speicher).
     status_seed = "" if is_t4 else NONE_REPORTED
-    konfidenz, gruende = compute_konfidenz(record_typ, status_seed, frische_valide=True)
-    gruende = list(gruende)
+    konfidenz, gruende_t = compute_konfidenz(record_typ, status_seed, frische_valide=True)
+    gruende: list[str] = list(gruende_t)
     if konfidenz_flag:
         grund = _FLAG_GRUND.get(trigger_key)
         if grund and grund not in gruende:

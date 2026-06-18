@@ -29,7 +29,7 @@ def iso_woche(tag: dt.date | None = None) -> str:
 
 def _jetzt() -> str:
     """Erfassungs-Zeitstempel (UTC, sekundengenau) — Audit, wann das Ereignis geschrieben wurde."""
-    return dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
+    return dt.datetime.now(dt.UTC).isoformat(timespec="seconds")
 
 
 def record(

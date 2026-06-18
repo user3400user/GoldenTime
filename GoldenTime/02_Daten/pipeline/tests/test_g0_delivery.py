@@ -22,8 +22,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from pipeline import cli
-from pipeline import deliver
+from pipeline import cli, deliver
 from pipeline.control import config_store as cs
 from pipeline.control import state as statemod
 from pipeline.ledger import ledger as ledgermod

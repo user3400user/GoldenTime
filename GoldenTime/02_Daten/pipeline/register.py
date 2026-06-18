@@ -19,9 +19,10 @@ darum führt der Adapter beides in ``raw`` mit, gibt aber IBN als ``datum`` aus)
 from __future__ import annotations
 
 import sqlite3
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Iterator, Protocol, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 # --- Energieträger-Typen (quell-neutral; Adapter mappt sein Schema hierauf) ----------
 # Bewusst Strings (nicht die MaStR-Web-JSON-Codes 2495/2496 aus config.py): das Interface

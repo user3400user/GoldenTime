@@ -19,8 +19,7 @@ from urllib.parse import parse_qs
 
 from .. import ledger
 from ..control import config_store as cs
-from ..control import metrics
-from ..control import state
+from ..control import metrics, state
 from . import views
 
 log = logging.getLogger(__name__)

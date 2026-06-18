@@ -1,4 +1,5 @@
 """Komponente 5 — Signal-Record-Schema: die zentrale Datenstruktur des Vollpakets."""
+from .from_lead import from_lead
 from .record import (
     SignalRecord,
     compute_konfidenz,
@@ -7,7 +8,6 @@ from .record import (
     mastr_einheit_url,
     mastr_suchlink,
 )
-from .from_lead import from_lead
 
 __all__ = [
     "SignalRecord",

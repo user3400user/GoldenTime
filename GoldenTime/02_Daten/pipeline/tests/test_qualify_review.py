@@ -240,6 +240,7 @@ class TestQaGateStoredDecision(unittest.TestCase):
     def test_gespeicherter_reject_haelt_auch_ohne_flag(self):
         import pathlib
         import tempfile
+
         from pipeline.control import state
         with tempfile.TemporaryDirectory() as d:
             con = state.connect(pathlib.Path(d) / "s.db")
@@ -257,6 +258,7 @@ class TestQaGateStoredDecision(unittest.TestCase):
     def test_kein_eintrag_ohne_flag_bleibt_auto_ok(self):
         import pathlib
         import tempfile
+
         from pipeline.control import state
         with tempfile.TemporaryDirectory() as d:
             con = state.connect(pathlib.Path(d) / "s.db")

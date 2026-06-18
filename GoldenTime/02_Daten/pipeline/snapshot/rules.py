@@ -64,7 +64,7 @@ class PrevIndex:
     solar_operators: frozenset[str]
 
     @classmethod
-    def from_snapshot(cls, prev_path: Path | str) -> "PrevIndex":
+    def from_snapshot(cls, prev_path: Path | str) -> PrevIndex:
         """Baue den PrevIndex aus einem prev-Snapshot (traeger='solar' -> ABR-Set)."""
         con = sqlite3.connect(str(prev_path))
         try:
