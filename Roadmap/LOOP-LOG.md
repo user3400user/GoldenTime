@@ -181,3 +181,39 @@ Geprüfte Alternativen für die erste Bau-Schleife:
 - **Gebaut:** `deliver._assert_reconciliation` (lieferbar+nat_gesperrt+pending+namenlos+rejected+geplant == roh) in `run_region` am konservierten Punkt (nach e.K.-Carve-out, VOR der käufer-spezifischen Ledger-Vorschau). Verletzung → `ValueError`, Lauf blockiert. 2 Tests (aufgehend ok / Leck blockiert). **373 Tests grün**, Gate grün.
 
 **Status Loop 6: ✅ ABGESCHLOSSEN.** — Damit sind die genuin baubaren, nicht-blockierten, nicht-über-engineerten Hebel ausgeschöpft (s. Closeout-Abschnitt unten).
+
+---
+
+# CLOSEOUT — Doppelt gemessen (§2) · Stand der 7 Loops (18.06.2026)
+
+## Engineering-Scorecard (§4a) — Re-Score je Dimension, mit Beleg
+| # | Dimension | Ist 17.06. | **Jetzt** | Zielband | Belegt durch |
+|---|---|:--:|:--:|:--:|---|
+| 1 | Funktionsumfang | 3 (eff. 2) | **eff. 3,5** | 4,5 | USP erzwungen (Loop 0) + Portal-Asset (Loop 3) |
+| 2 | Korrektheit | 4 | **4** | 5,0 | refute-gehärtet, G5, Reconciliation-Block; *5,0 = property/mutation-Tests + kalibrierte Konfidenz → Kundenlast* |
+| 3 | UX & visuelle Professionalität | 2 | **4** | 4,5 | Kundenportal Login/Auth/Mandanten/Provenance-1-Klick (Loop 3) |
+| 4 | Performance | 3 | **3** | 4,5 | Workload adäquat; *Diff-RAM/Streaming = M3 (64-GB-ZBook unkritisch)* |
+| 5 | Observability/Tracking | 2 | **3** | 5,0 | G17-Anomalie + Metriken; *Run-History/Push-Alert = M2 (hängt am Wochen-Fluss/Kunde)* |
+| 6 | Sicherheit (Recht · Infra) | 2 | **3** | 5,0 · 4,5 | Recht: e.K.-Filter+dl-de+LIVE-Guard · Infra: Portal-Auth security-reviewed; *LIA/DPIA = Anwalt (PT1)* |
+| 7 | Datenqualität & -integrität | 3 | **4** | 5,0 | Daten-Kontrakt/Schema-Drift-Gate (Loop 5) + I5-Block; *Feld-Lineage = M2* |
+| 8 | Wartbarkeit/Codequalität | 3 | **4** | 4,5 | ruff+mypy-Gate grün + CI + Lockfile (Loop 4) |
+| 9 | Deploy-/Betriebsreife | 2 | **3,5** | 4,5 | getesteter Restore (Loop 2) + CI/Lockfile; *IaC/Hosting/Scheduling = M2/M3-Gründer-Entscheid* |
+
+**Schnitt ≈ 2,6 → ≈ 3,6.** Jede In-Scope-Dimension ist am **pre-revenue justified level** (das Zielbild zieht 4,5–5,0 bewusst **erst unter realer Kundenlast** — alles davor wäre Over-Engineering ohne Gegenwert).
+
+## DoD des Runs (§9) — Stand
+- §9.4 Portal (Auth, Sample-Daten, LIVE aus) — **✅ erfüllt.**
+- §9.5 Invarianten intakt · **CI grün** · **getesteter Restore** — **✅ erfüllt.**
+- §9.6 `LOOP-METRICS.md` echte Dichte-Zahlen je Demo-Gebiet — **✅ erfüllt** (T1/T4-Fluss extern blockiert).
+- §9.7 Keine echte bezahlte Lieferung — **✅ bewusst gehalten** (LIVE aus, CC nie gesetzt).
+- §9.1 Scorecard im Zielband — **teilweise**: In-Scope-Dims am pre-revenue-Level; 4,5–5,0 ist Zielbild-deferred auf Kundenlast.
+- §9.2 Konzept-Landkarte wo wedge-stärkend — **✅ wesentlich** (USP/Provenance/Exklusivität); Frische (T2-irrelevant) + Feld-Provenance vertagt.
+- §9.3 Käufer-Frage-Batterie auf Echtdaten (e.K. gefiltert) — **technisch ✅** (Exklusivität/Dedupe/Provenance/Demo); offen: §7-UWG + WTP (Anwalt/Gründer).
+
+## Was bleibt — und WARUM nicht von mir baubar
+1. **Menschen-Gate:** Anwalt (PT1, Art-6(1)(f)+§7-UWG, LIA/DPIA → Recht 5,0) · Mensch-QA-Durchlauf der ~134 Pending (`qa suggest`).
+2. **Extern blockiert:** T1/T4-Kaufmoment-Beweis — MaStR-Download-Host resettet (2. Snapshot/Wochen-Diff; davon hängen Observability/Performance-Politur ab).
+3. **Zielbild-deferred (Kundenlast):** kalibrierte Konfidenz · Run-History/Push-Alerting · Feld-Lineage · IaC/Hosting — bewusst NICHT vorgezogen (Over-Engineering ohne Kunden).
+4. **Gründer-Strategie (in `KONZEPT-LANDKARTE.md` §6/§9 markiert):** Dichte-vs-Exklusivität-Umsatzdeckel · §7-UWG-Kanal · open-mastr-Wettbewerber-Blindfleck.
+
+**Verdikt (ehrlich):** Der **M1-Code-Pfad ist komplett + top-tier**; die buildable DoD-§9-Items stehen (Portal/CI/Restore/Datenkontrakt). Der kritische Pfad zum Meilenstein (Kunde #1) ist jetzt **rein menschlich** (Anwalt + QA) bzw. extern (Download). Weiter zu „bauen" hieße entweder Over-Engineering gegen das Zielbild, blockierte oder Gründer-Strategie-Arbeit — daher: **Bau-Stop an dieser Schleifen-Grenze ist die top-tier-Entscheidung**, nicht ein vorzeitiges Aufhören.
